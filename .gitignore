@@ -22,6 +22,11 @@ pip-wheel-metadata/
 .coverage.*
 htmlcov/
 
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
 # Type checking
 .mypy_cache/
 
