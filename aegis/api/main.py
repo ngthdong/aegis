@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
 from aegis.api.routers import health
 from aegis.common.logging import configure_logging, get_logger
 from aegis.config.settings import Settings, get_settings

@@ -4,6 +4,7 @@ import logging
 import sys
 
 import structlog
+
 from aegis.config.settings import Settings
 
 
