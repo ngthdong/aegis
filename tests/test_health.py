@@ -1,16 +1,16 @@
-def test_liveness(client):
+def test_liveness(client) -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
-def test_readiness(client):
+def test_readiness(client) -> None:
     response = client.get("/ready")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
-def test_app_is_isolated_per_settings_instance(settings):
+def test_app_is_isolated_per_settings_instance(settings) -> None:
     from aegis.api.main import create_app
     from aegis.config.settings import Settings
 

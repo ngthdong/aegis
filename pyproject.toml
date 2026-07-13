@@ -10,6 +10,8 @@ dependencies = [
     "pydantic-settings>=2.2",
     "structlog>=24.1",
     "python-dotenv>=1.0",
+    "cryptography", 
+    "argon2-cffi",
 ]
 
 [project.optional-dependencies]
