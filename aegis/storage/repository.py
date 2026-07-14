@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from aegis.core.service import VaultMeta
 from aegis.crypto.aead import Envelope
@@ -13,7 +13,7 @@ from aegis.storage.unit_of_work import UnitOfWork
 
 
 class SqlVaultRepository:
-    def __init__(self, session_factory: sessionmaker) -> None:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
     def load(self) -> VaultMeta | None:

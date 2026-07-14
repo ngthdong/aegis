@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from aegis.config.settings import Settings
 
@@ -23,5 +23,5 @@ def create_memory_engine() -> Engine:
     )
 
 
-def get_sessionmaker(engine: Engine) -> sessionmaker:
+def get_sessionmaker(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)

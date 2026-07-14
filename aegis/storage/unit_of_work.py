@@ -6,12 +6,17 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 class UnitOfWork:
-    def __init__(self, session_factory: sessionmaker) -> None:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
-        self.session: Session | None = None  # type: ignore[assignment]
+        self._session: Session | None = None
+
+    @property
+    def session(self) -> Session:
+        assert self._session is not None
+        return self._session
 
     def __enter__(self) -> UnitOfWork:
-        self.session = self._session_factory()
+        self._session = self._session_factory()
         return self
 
     def __exit__(
@@ -20,15 +25,13 @@ class UnitOfWork:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        assert self.session is not None
         if exc_type is not None:
             self.session.rollback()
+
         self.session.close()
 
     def commit(self) -> None:
-        assert self.session is not None
         self.session.commit()
 
     def rollback(self) -> None:
-        assert self.session is not None
         self.session.rollback()
