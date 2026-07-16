@@ -12,7 +12,8 @@ class UnitOfWork:
 
     @property
     def session(self) -> Session:
-        assert self._session is not None
+        if self._session is None:
+            raise AssertionError
         return self._session
 
     def __enter__(self) -> UnitOfWork:
