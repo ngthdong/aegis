@@ -14,6 +14,8 @@ def create_sqlite_engine(settings: Settings) -> Engine:
 
     return create_engine(
         f"sqlite:///{db_path}",
+    return create_engine(
+        f"sqlite:///{settings.database_path}",
         connect_args={"check_same_thread": False},
     )
 
