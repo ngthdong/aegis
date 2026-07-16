@@ -23,7 +23,7 @@ def test_starts_uninitialized(vault: VaultService) -> None:
 
 
 def test_initialize_leaves_vault_sealed_not_unsealed(vault: VaultService) -> None:
-    vault.initialize("correct horse battery staple")
+    vault.initialize("correct horse battery staple.")
     assert vault.status() == VaultState.SEALED
 
 

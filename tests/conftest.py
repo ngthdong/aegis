@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from aegis.api.main import create_app
 from aegis.config.settings import Settings
+from aegis.storage.db import create_memory_engine
 
 
 @pytest.fixture
@@ -14,5 +15,6 @@ def settings() -> Settings:
 
 @pytest.fixture
 def client(settings: Settings) -> TestClient:
-    app = create_app(settings)
+    engine = create_memory_engine()
+    app = create_app(settings, engine=engine)
     return TestClient(app)
