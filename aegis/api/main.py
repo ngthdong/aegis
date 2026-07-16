@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
-from alembic.migration import Engine
 from fastapi import FastAPI
+from sqlalchemy import Engine
 
 from aegis.api.routers import auth, health, vault
 from aegis.common.errors import register_exception_handlers

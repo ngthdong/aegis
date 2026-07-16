@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Request
 
@@ -12,7 +12,7 @@ from aegis.core.state import VaultState
 
 
 def get_vault_service(request: Request) -> VaultService:
-    return request.app.state.vault_service
+    return cast(VaultService, request.app.state.vault_service)
 
 
 def get_auth_service(request: Request) -> AuthService:

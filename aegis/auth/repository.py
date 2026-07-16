@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Protocol
 
 from sqlalchemy import select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from aegis.auth.models import User
 from aegis.storage.models import UserRow
@@ -28,7 +28,7 @@ class InMemoryUserRepository:
 
 
 class SqlUserRepository:
-    def __init__(self, session_factory: sessionmaker) -> None:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
     def get_by_username(self, username: str) -> User | None:
