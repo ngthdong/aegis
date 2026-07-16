@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -7,8 +9,11 @@ from aegis.config.settings import Settings
 
 
 def create_sqlite_engine(settings: Settings) -> Engine:
+    db_path = Path(settings.database_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
     return create_engine(
-        f"sqlite:///{settings.database_path}",
+        f"sqlite:///{db_path}",
         connect_args={"check_same_thread": False},
     )
 

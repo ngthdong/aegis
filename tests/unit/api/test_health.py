@@ -13,8 +13,13 @@ def test_readiness(client) -> None:
 def test_app_is_isolated_per_settings_instance(settings) -> None:
     from aegis.api.main import create_app
     from aegis.config.settings import Settings
+    from aegis.storage.db import create_memory_engine
 
-    app_a = create_app(settings)
-    app_b = create_app(Settings(environment="test", log_json=False, app_name="other"))
+    app_a = create_app(settings, engine=create_memory_engine())
+    app_b = create_app(
+        Settings(environment="test", log_json=False, app_name="other"),
+        engine=create_memory_engine(),
+    )
 
     assert app_a.state.settings.app_name != app_b.state.settings.app_name
+    assert app_a.state.engine is not app_b.state.engine

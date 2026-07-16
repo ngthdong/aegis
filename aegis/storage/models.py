@@ -29,3 +29,20 @@ class VaultMetaRow(Base):
     @property
     def initialized_at_dt(self) -> datetime:
         return datetime.fromisoformat(self.initialized_at)
+
+
+class UserRow(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # uuid4 hex
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+
+    failed_login_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    locked_until: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    @property
+    def created_at_dt(self) -> datetime:
+        return datetime.fromisoformat(self.created_at)
