@@ -11,6 +11,7 @@ from aegis.core.service import (
     VaultAlreadyInitialized,
     VaultNotInitialized,
 )
+from aegis.kv.service import SecretCorrupted, SecretNotFound
 
 
 class VaultSealedError(Exception):
@@ -86,3 +87,13 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(PermissionDenied)
     async def _permission_denied(request: Request, exc: PermissionDenied) -> JSONResponse:
         return JSONResponse(status_code=403, content={"detail": str(exc)})
+
+    @app.exception_handler(SecretNotFound)
+    async def _secret_not_found(request: Request, exc: SecretNotFound) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(SecretCorrupted)
+    async def _secret_corrupted(request: Request, exc: SecretCorrupted) -> JSONResponse:
+        return JSONResponse(
+            status_code=500, content={"detail": "secret data integrity check failed"}
+        )

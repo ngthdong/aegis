@@ -6,7 +6,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import Engine
 
-from aegis.api.routers import auth, health, vault
+from aegis.api.routers import auth, health, kv, vault
 from aegis.common.clock import Clock, SystemClock
 from aegis.common.errors import register_exception_handlers
 from aegis.common.logging import configure_logging, get_logger
@@ -65,6 +65,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(vault.router)
     app.include_router(auth.router)
+    app.include_router(kv.router)
 
     register_exception_handlers(app)
 

@@ -9,7 +9,8 @@ logger = get_logger(__name__)
 
 
 class OwnedResource(Protocol):
-    owner_id: str
+    @property
+    def owner_id(self) -> str: ...
 
 
 class PermissionDenied(Exception):

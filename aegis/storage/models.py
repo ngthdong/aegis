@@ -59,3 +59,17 @@ class UserRow(Base):
     @property
     def created_at_dt(self) -> datetime:
         return datetime.fromisoformat(self.created_at)
+
+
+class SecretRow(Base):
+    __tablename__ = "secrets"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    path: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    owner_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
