@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -24,11 +24,11 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_vault_service(request: Request) -> VaultService:
-    return request.app.state.vault_service
+    return cast(VaultService, request.app.state.vault_service)
 
 
 def get_clock(request: Request) -> Clock:
-    return request.app.state.clock
+    return cast(Clock, request.app.state.clock)
 
 
 def get_session_service(request: Request) -> SessionService:

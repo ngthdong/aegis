@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from aegis.auth.session_service import SessionRecord
 from aegis.storage.models import SessionRow
@@ -29,7 +29,7 @@ class InMemorySessionRepository:
 
 
 class SqlSessionRepository:
-    def __init__(self, session_factory: sessionmaker) -> None:
+    def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
 
     def save(self, session: SessionRecord) -> None:

@@ -52,3 +52,5 @@ line-ending = "lf"
 python_version = "3.11"
 strict = true
 warn_unused_configs = true
+explicit_package_bases = true
+namespace_packages = true
