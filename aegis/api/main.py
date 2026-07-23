@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from sqlalchemy import Engine
 
 from aegis.api.routers import auth, health, vault
+from aegis.common.clock import Clock, SystemClock
 from aegis.common.errors import register_exception_handlers
 from aegis.common.logging import configure_logging, get_logger
 from aegis.config.settings import Settings, get_settings
@@ -30,15 +31,19 @@ def _build_lifespan(
             log_level=settings.log_level.value,
         )
         yield
+        engine.dispose()
         logger.info("shutdown")
 
     return lifespan
 
 
-def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None, engine: Engine | None = None, clock: Clock | None = None
+) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
     engine = engine or create_sqlite_engine(settings)
+    clock = clock or SystemClock()
 
     Base.metadata.create_all(engine)
 
@@ -54,6 +59,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    app.state.clock = clock
     app.state.vault_service = VaultService(SqlVaultRepository(session_factory))
 
     app.include_router(health.router)

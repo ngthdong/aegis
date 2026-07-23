@@ -2,11 +2,16 @@ import pytest
 
 from aegis.auth.repository import InMemoryUserRepository
 from aegis.auth.service import AuthService, UsernameTaken, WeakPassword
+from aegis.auth.session_repository import InMemorySessionRepository
+from aegis.auth.session_service import SessionService
+from aegis.common.clock import FakeClock
 
 
 @pytest.fixture
 def auth_service() -> AuthService:
-    return AuthService(InMemoryUserRepository())
+    clock = FakeClock()
+    session_service = SessionService(InMemorySessionRepository(), clock)
+    return AuthService(InMemoryUserRepository(), session_service, clock)
 
 
 def test_register_returns_a_user_id(auth_service: AuthService):
