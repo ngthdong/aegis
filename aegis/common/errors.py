@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from aegis.auth.service import AccountLocked, InvalidCredentials, UsernameTaken, WeakPassword
 from aegis.auth.session_service import SessionExpired, SessionNotFound, SessionRevoked
+from aegis.authz.service import PermissionDenied
 from aegis.core.service import (
     InvalidPassphrase,
     VaultAlreadyInitialized,
@@ -81,3 +82,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SessionRevoked)
     async def _session_revoked(request: Request, exc: SessionRevoked) -> JSONResponse:
         return JSONResponse(status_code=401, content={"detail": "invalid or expired session"})
+
+    @app.exception_handler(PermissionDenied)
+    async def _permission_denied(request: Request, exc: PermissionDenied) -> JSONResponse:
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
