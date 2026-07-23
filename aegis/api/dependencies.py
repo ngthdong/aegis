@@ -15,10 +15,13 @@ from aegis.auth.session_service import (
     SessionRevoked,
     SessionService,
 )
+from aegis.authz.service import AuthzService
 from aegis.common.clock import Clock
 from aegis.common.errors import InvalidSessionError, VaultSealedError
 from aegis.core.service import VaultService
 from aegis.core.state import VaultState
+from aegis.kv.repository import SqlSecretRepository
+from aegis.kv.service import KvService
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -40,6 +43,20 @@ def get_auth_service(request: Request) -> AuthService:
     user_repository = SqlUserRepository(request.app.state.session_factory)
     session_service = get_session_service(request)
     return AuthService(user_repository, session_service, request.app.state.clock)
+
+
+def get_authz_service() -> AuthzService:
+    return AuthzService()
+
+
+def get_kv_service(request: Request) -> KvService:
+    repository = SqlSecretRepository(request.app.state.session_factory)
+    return KvService(
+        repository,
+        get_authz_service(),
+        request.app.state.vault_service,
+        request.app.state.clock,
+    )
 
 
 def require_vault_unsealed(
@@ -68,4 +85,5 @@ AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 RequireVaultUnsealed = Annotated[None, Depends(require_vault_unsealed)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
+KvServiceDep = Annotated[KvService, Depends(get_kv_service)]
 BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]
