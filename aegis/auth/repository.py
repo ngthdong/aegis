@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Protocol
 
@@ -14,6 +15,9 @@ from aegis.storage.unit_of_work import UnitOfWork
 class UserRepository(Protocol):
     def get_by_username(self, username: str) -> User | None: ...
     def save(self, user: User) -> None: ...
+    def update_login_state(
+        self, user_id: str, failed_login_count: int, locked_until: datetime | None
+    ) -> None: ...
 
 
 class InMemoryUserRepository:
@@ -25,6 +29,16 @@ class InMemoryUserRepository:
 
     def save(self, user: User) -> None:
         self._users[user.username] = user
+
+    def update_login_state(
+        self, user_id: str, failed_login_count: int, locked_until: datetime | None
+    ) -> None:
+        for username, user in self._users.items():
+            if user.id == user_id:
+                self._users[username] = replace(
+                    user, failed_login_count=failed_login_count, locked_until=locked_until
+                )
+                return
 
 
 class SqlUserRepository:
@@ -52,6 +66,18 @@ class SqlUserRepository:
             )
             uow.session.add(row)
             uow.commit()
+
+    def update_login_state(
+        self, user_id: str, failed_login_count: int, locked_until: datetime | None
+    ) -> None:
+        with UnitOfWork(self._session_factory) as uow:
+            row = uow.session.execute(
+                select(UserRow).where(UserRow.id == user_id)
+            ).scalar_one_or_none()
+            if row is not None:
+                row.failed_login_count = failed_login_count
+                row.locked_until = locked_until.isoformat() if locked_until else None
+                uow.commit()
 
 
 def _row_to_user(row: UserRow) -> User:
