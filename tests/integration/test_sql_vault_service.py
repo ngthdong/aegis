@@ -70,11 +70,6 @@ def test_dek_stable_across_seal_unseal_against_real_sqlite(sql_vault: VaultServi
 
 
 def test_corrupted_row_reported_as_invalid_passphrase(sql_vault: VaultService):
-    """
-    Same tamper test as Stage 1, but now the corruption happens in an
-    actual SQL row rather than an in-memory dataclass -- proving the
-    property survives the storage-layer swap, not just in theory.
-    """
     sql_vault.initialize("correct horse battery staple")
 
     repo = sql_vault._repository  # type: ignore[attr-defined]

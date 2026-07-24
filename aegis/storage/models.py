@@ -96,9 +96,15 @@ class TransitKeyRow(Base):
     owner_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     algorithm: Mapped[str] = mapped_column(String, nullable=False, default="AES-256-GCM")
 
-    key_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    wrapped_key_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    key_type: Mapped[str] = mapped_column(String, nullable=False, default="symmetric")
+
+    key_nonce: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    wrapped_key_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+
+    public_key: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
     disabled: Mapped[bool] = mapped_column(nullable=False, default=False)
+
+    destroyed_at: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[str] = mapped_column(String, nullable=False)
