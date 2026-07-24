@@ -24,6 +24,8 @@ from aegis.core.service import VaultService
 from aegis.core.state import VaultState
 from aegis.kv.repository import SqlSecretRepository
 from aegis.kv.service import KvService
+from aegis.transit.repository import SqlTransitKeyRepository
+from aegis.transit.service import TransitService
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -67,6 +69,17 @@ def get_kv_service(request: Request) -> KvService:
     )
 
 
+def get_transit_service(request: Request) -> TransitService:
+    repository = SqlTransitKeyRepository(request.app.state.session_factory)
+    return TransitService(
+        repository,
+        get_authz_service(),
+        request.app.state.vault_service,
+        request.app.state.clock,
+        get_audit_logger(request),
+    )
+
+
 def require_vault_unsealed(
     vault: Annotated[VaultService, Depends(get_vault_service)],
 ) -> None:
@@ -94,4 +107,5 @@ RequireVaultUnsealed = Annotated[None, Depends(require_vault_unsealed)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
 KvServiceDep = Annotated[KvService, Depends(get_kv_service)]
+TransitServiceDep = Annotated[TransitService, Depends(get_transit_service)]
 BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]

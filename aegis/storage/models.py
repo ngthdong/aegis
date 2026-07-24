@@ -86,3 +86,19 @@ class AuditLogRow(Base):
     resource_id: Mapped[str | None] = mapped_column(String, nullable=True)
     outcome: Mapped[str] = mapped_column(String, nullable=False)
     metadata_json: Mapped[str] = mapped_column(String, nullable=False, default="{}")
+
+
+class TransitKeyRow(Base):
+    __tablename__ = "transit_keys"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    owner_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    algorithm: Mapped[str] = mapped_column(String, nullable=False, default="AES-256-GCM")
+
+    key_nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    wrapped_key_ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    disabled: Mapped[bool] = mapped_column(nullable=False, default=False)
+
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
