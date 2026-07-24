@@ -5,6 +5,8 @@ from typing import Annotated, cast
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from aegis.audit.logger import AuditLogger
+from aegis.audit.repository import SqlAuditRepository
 from aegis.auth.repository import SqlUserRepository
 from aegis.auth.service import AuthService
 from aegis.auth.session_repository import SqlSessionRepository
@@ -49,6 +51,11 @@ def get_authz_service() -> AuthzService:
     return AuthzService()
 
 
+def get_audit_logger(request: Request) -> AuditLogger:
+    repository = SqlAuditRepository(request.app.state.session_factory)
+    return AuditLogger(repository, request.app.state.clock)
+
+
 def get_kv_service(request: Request) -> KvService:
     repository = SqlSecretRepository(request.app.state.session_factory)
     return KvService(
@@ -56,6 +63,7 @@ def get_kv_service(request: Request) -> KvService:
         get_authz_service(),
         request.app.state.vault_service,
         request.app.state.clock,
+        get_audit_logger(request),
     )
 
 

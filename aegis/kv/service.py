@@ -4,14 +4,17 @@ import json
 import uuid
 from typing import Any, cast
 
+from aegis.audit.logger import AuditLogger
 from aegis.auth.session_service import Principal
-from aegis.authz.service import AuthzService
+from aegis.authz.service import AuthzService, PermissionDenied
 from aegis.common.clock import Clock
 from aegis.core.service import VaultService
 from aegis.crypto.aead import DecryptionError, encrypt
 from aegis.crypto.aead import decrypt as aead_decrypt
 from aegis.kv.models import Secret
 from aegis.kv.repository import SecretRepository
+
+_RESOURCE_TYPE = "secret"
 
 
 class SecretNotFound(Exception):
@@ -33,19 +36,42 @@ class KvService:
         authz: AuthzService,
         vault: VaultService,
         clock: Clock,
+        audit: AuditLogger,
     ) -> None:
         self._repository = repository
         self._authz = authz
         self._vault = vault
         self._clock = clock
+        self._audit = audit
+
+    def _record(
+        self,
+        principal: Principal,
+        action: str,
+        path: str,
+        outcome: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        self._audit.record(
+            principal_id=principal.user_id,
+            action=action,
+            resource_type=_RESOURCE_TYPE,
+            resource_id=path,
+            outcome=outcome,  # type: ignore[arg-type]
+            metadata=metadata,
+        )
 
     def write(self, principal: Principal, path: str, value: dict[str, Any]) -> None:
         existing = self._repository.get_by_path(path)
         now = self._clock.now()
 
         if existing is not None:
-            self._authz.require(principal, "write", existing)
-            owner_id = existing.owner_id  # overwrite never changes ownership
+            try:
+                self._authz.require(principal, "write", existing)
+            except PermissionDenied:
+                self._record(principal, "kv.write", path, "denied")
+                raise
+            owner_id = existing.owner_id
             created_at = existing.created_at
         else:
             owner_id = principal.user_id
@@ -65,26 +91,42 @@ class KvService:
                 updated_at=now,
             )
         )
+        self._record(principal, "kv.write", path, "success")
 
     def read(self, principal: Principal, path: str) -> dict[str, Any]:
         secret = self._repository.get_by_path(path)
         if secret is None:
+            self._record(principal, "kv.read", path, "error", {"reason": "not_found"})
             raise SecretNotFound(f"no secret at path '{path}'")
 
-        self._authz.require(principal, "read", secret)
+        try:
+            self._authz.require(principal, "read", secret)
+        except PermissionDenied:
+            self._record(principal, "kv.read", path, "denied")
+            raise
 
         dek = self._vault.get_dek()
         try:
             plaintext = aead_decrypt(dek, secret.envelope, aad=_aad(secret.owner_id, path))
         except DecryptionError as exc:
+            self._record(principal, "kv.read", path, "error", {"reason": "corrupted"})
             raise SecretCorrupted(f"secret at path '{path}' failed integrity verification") from exc
+
+        self._record(principal, "kv.read", path, "success")
 
         return cast(dict[str, Any], json.loads(plaintext))
 
     def delete(self, principal: Principal, path: str) -> None:
         secret = self._repository.get_by_path(path)
         if secret is None:
+            self._record(principal, "kv.delete", path, "error", {"reason": "not_found"})
             raise SecretNotFound(f"no secret at path '{path}'")
 
-        self._authz.require(principal, "delete", secret)
+        try:
+            self._authz.require(principal, "delete", secret)
+        except PermissionDenied:
+            self._record(principal, "kv.delete", path, "denied")
+            raise
+
         self._repository.delete(path)
+        self._record(principal, "kv.delete", path, "success")

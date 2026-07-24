@@ -73,3 +73,16 @@ class SecretRow(Base):
 
     created_at: Mapped[str] = mapped_column(String, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class AuditLogRow(Base):
+    __tablename__ = "audit_log"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    timestamp: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    principal_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String, nullable=False)
+    resource_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+    metadata_json: Mapped[str] = mapped_column(String, nullable=False, default="{}")
