@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from aegis.audit.logger import AuditLogger
 from aegis.auth.session_service import Principal
@@ -113,7 +113,8 @@ class KvService:
             raise SecretCorrupted(f"secret at path '{path}' failed integrity verification") from exc
 
         self._record(principal, "kv.read", path, "success")
-        return json.loads(plaintext)
+
+        return cast(dict[str, Any], json.loads(plaintext))
 
     def delete(self, principal: Principal, path: str) -> None:
         secret = self._repository.get_by_path(path)
