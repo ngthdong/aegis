@@ -15,7 +15,10 @@ from aegis.kv.service import SecretCorrupted, SecretNotFound
 from aegis.transit.service import (
     TransitDecryptionFailed,
     TransitKeyAlreadyExists,
+    TransitKeyDestroyed,
+    TransitKeyDisabled,
     TransitKeyNotFound,
+    WrongKeyType,
 )
 
 
@@ -112,6 +115,18 @@ def register_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: TransitKeyAlreadyExists
     ) -> JSONResponse:
         return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(TransitKeyDisabled)
+    async def _transit_key_disabled(request: Request, exc: TransitKeyDisabled) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(TransitKeyDestroyed)
+    async def _transit_key_destroyed(request: Request, exc: TransitKeyDestroyed) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(WrongKeyType)
+    async def _wrong_key_type(request: Request, exc: WrongKeyType) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.exception_handler(TransitDecryptionFailed)
     async def _transit_decryption_failed(
