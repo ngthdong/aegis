@@ -12,6 +12,11 @@ from aegis.core.service import (
     VaultNotInitialized,
 )
 from aegis.kv.service import SecretCorrupted, SecretNotFound
+from aegis.transit.service import (
+    TransitDecryptionFailed,
+    TransitKeyAlreadyExists,
+    TransitKeyNotFound,
+)
 
 
 class VaultSealedError(Exception):
@@ -97,3 +102,19 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=500, content={"detail": "secret data integrity check failed"}
         )
+
+    @app.exception_handler(TransitKeyNotFound)
+    async def _transit_key_not_found(request: Request, exc: TransitKeyNotFound) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(TransitKeyAlreadyExists)
+    async def _transit_key_already_exists(
+        request: Request, exc: TransitKeyAlreadyExists
+    ) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(TransitDecryptionFailed)
+    async def _transit_decryption_failed(
+        request: Request, exc: TransitDecryptionFailed
+    ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
