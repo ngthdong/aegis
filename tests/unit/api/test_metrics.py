@@ -15,32 +15,32 @@ def _setup_vault_and_login(client: TestClient, username: str = "alice") -> str:
 
 
 def test_every_response_carries_a_request_id_header(client: TestClient):
-    resp = client.get("/healthz")
+    resp = client.get("/health")
     assert "X-Request-ID" in resp.headers
 
 
 def test_two_requests_get_different_request_ids(client: TestClient):
-    resp_a = client.get("/healthz")
-    resp_b = client.get("/healthz")
+    resp_a = client.get("/health")
+    resp_b = client.get("/health")
     assert resp_a.headers["X-Request-ID"] != resp_b.headers["X-Request-ID"]
 
 
 def test_metrics_endpoint_returns_prometheus_text_format(client: TestClient):
     resp = client.get("/metrics")
     assert resp.status_code == 200
-    assert "secretsvc_http_requests_total" in resp.text
-    assert "secretsvc_vault_sealed" in resp.text
+    assert "aegis_http_requests_total" in resp.text
+    assert "aegis_vault_sealed" in resp.text
 
 
 def test_metrics_reflect_vault_seal_state(client: TestClient):
     resp = client.get("/metrics")
-    assert "secretsvc_vault_sealed 1.0" in resp.text
+    assert "aegis_vault_sealed 1.0" in resp.text
 
     client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
     client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
 
     resp = client.get("/metrics")
-    assert "secretsvc_vault_sealed 0.0" in resp.text
+    assert "aegis_vault_sealed 0.0" in resp.text
 
 
 def test_metrics_use_route_template_not_raw_path(client: TestClient):
@@ -72,7 +72,7 @@ def test_kv_operations_increment_the_kv_metric(client: TestClient):
     client.put("/v1/kv/metrics-test/path", json={"value": "x"}, headers=headers)
 
     resp = client.get("/metrics")
-    assert 'secretsvc_kv_operations_total{action="write",outcome="success"}' in resp.text
+    assert 'aegis_kv_operations_total{action="write",outcome="success"}' in resp.text
 
 
 def test_auth_failure_increments_the_auth_failure_metric(client: TestClient):
@@ -80,4 +80,4 @@ def test_auth_failure_increments_the_auth_failure_metric(client: TestClient):
     client.post("/v1/auth/login", json={"username": "alice", "password": "wrong"})
 
     resp = client.get("/metrics")
-    assert "secretsvc_auth_failures_total 1.0" in resp.text
+    assert "aegis_auth_failures_total 1.0" in resp.text

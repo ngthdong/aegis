@@ -29,35 +29,35 @@ def create_metrics() -> Metrics:
     return Metrics(
         registry=registry,
         http_requests_total=Counter(
-            "secretsvc_http_requests_total",
+            "aegis_http_requests_total",
             "Total HTTP requests",
             labelnames=("method", "route", "status_code"),
             registry=registry,
         ),
         http_request_duration_seconds=Histogram(
-            "secretsvc_http_request_duration_seconds",
+            "aegis_http_request_duration_seconds",
             "HTTP request latency in seconds",
             labelnames=("method", "route"),
             registry=registry,
         ),
         vault_sealed=Gauge(
-            "secretsvc_vault_sealed",
+            "aegis_vault_sealed",
             "1 if the vault is currently sealed or uninitialized, 0 if unsealed",
             registry=registry,
         ),
         auth_failures_total=Counter(
-            "secretsvc_auth_failures_total",
+            "aegis_auth_failures_total",
             "Total failed login attempts",
             registry=registry,
         ),
         kv_operations_total=Counter(
-            "secretsvc_kv_operations_total",
+            "aegis_kv_operations_total",
             "Total KV engine operations",
             labelnames=("action", "outcome"),
             registry=registry,
         ),
         transit_operations_total=Counter(
-            "secretsvc_transit_operations_total",
+            "aegis_transit_operations_total",
             "Total Transit engine operations",
             labelnames=("action", "outcome"),
             registry=registry,

@@ -25,7 +25,7 @@ async def readiness(request: Request, response: Response) -> dict[str, object]:
             session.execute(text("SELECT 1"))
         checks["database"] = True
     except Exception:
-        logger.warning("readyz.database_check_failed")
+        logger.warning("ready.database_check_failed")
         checks["database"] = False
 
     vault_status = request.app.state.vault_service.status()
