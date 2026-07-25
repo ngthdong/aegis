@@ -46,7 +46,9 @@ def get_session_service(request: Request) -> SessionService:
 def get_auth_service(request: Request) -> AuthService:
     user_repository = SqlUserRepository(request.app.state.session_factory)
     session_service = get_session_service(request)
-    return AuthService(user_repository, session_service, request.app.state.clock)
+    return AuthService(
+        user_repository, session_service, request.app.state.clock, request.app.state.metrics
+    )
 
 
 def get_authz_service() -> AuthzService:
@@ -55,7 +57,11 @@ def get_authz_service() -> AuthzService:
 
 def get_audit_logger(request: Request) -> AuditLogger:
     repository = SqlAuditRepository(request.app.state.session_factory)
-    return AuditLogger(repository, request.app.state.clock)
+    return AuditLogger(repository, request.app.state.clock, request.app.state.metrics)
+
+
+def get_audit_repository(request: Request) -> SqlAuditRepository:
+    return SqlAuditRepository(request.app.state.session_factory)
 
 
 def get_kv_service(request: Request) -> KvService:
@@ -105,7 +111,8 @@ VaultServiceDependency = Annotated[VaultService, Depends(get_vault_service)]
 AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 RequireVaultUnsealed = Annotated[None, Depends(require_vault_unsealed)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
-SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
-KvServiceDep = Annotated[KvService, Depends(get_kv_service)]
-TransitServiceDep = Annotated[TransitService, Depends(get_transit_service)]
+SessionServiceDependency = Annotated[SessionService, Depends(get_session_service)]
+KvServiceDependency = Annotated[KvService, Depends(get_kv_service)]
+TransitServiceDependency = Annotated[TransitService, Depends(get_transit_service)]
+AuditRepositoryDependency = Annotated[SqlAuditRepository, Depends(get_audit_repository)]
 BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]

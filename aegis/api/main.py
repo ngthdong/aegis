@@ -3,15 +3,18 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from sqlalchemy import Engine
 
-from aegis.api.routers import auth, health, kv, transit, vault
+from aegis.api.middleware import register_middleware
+from aegis.api.routers import audit, auth, health, kv, transit, vault
 from aegis.common.clock import Clock, SystemClock
 from aegis.common.errors import register_exception_handlers
 from aegis.common.logging import configure_logging, get_logger
+from aegis.common.metrics import create_metrics, render_metrics
 from aegis.config.settings import Settings, get_settings
 from aegis.core.service import VaultService
+from aegis.core.state import VaultState
 from aegis.storage.db import create_sqlite_engine, get_sessionmaker
 from aegis.storage.models import Base
 from aegis.storage.repository import SqlVaultRepository
@@ -60,6 +63,7 @@ def create_app(
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.clock = clock
+    app.state.metrics = create_metrics()
     app.state.vault_service = VaultService(SqlVaultRepository(session_factory))
 
     app.include_router(health.router)
@@ -67,8 +71,19 @@ def create_app(
     app.include_router(auth.router)
     app.include_router(kv.router)
     app.include_router(transit.router)
+    app.include_router(audit.router)
 
+    register_middleware(app)
     register_exception_handlers(app)
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint() -> Response:
+        app_metrics = app.state.metrics
+        app_metrics.vault_sealed.set(
+            0 if app.state.vault_service.status() == VaultState.UNSEALED else 1
+        )
+        body, content_type = render_metrics(app_metrics)
+        return Response(content=body, media_type=content_type)
 
     return app
 
