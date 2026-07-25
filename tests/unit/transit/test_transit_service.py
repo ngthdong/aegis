@@ -7,6 +7,7 @@ from aegis.audit.repository import InMemoryAuditRepository
 from aegis.auth.session_service import Principal
 from aegis.authz.service import AuthzService, PermissionDenied
 from aegis.common.clock import FakeClock
+from aegis.common.metrics import create_metrics
 from aegis.core.repository import InMemoryVaultRepository
 from aegis.core.service import VaultService
 from aegis.transit.repository import InMemoryTransitKeyRepository
@@ -41,7 +42,7 @@ def transit(unsealed_vault: VaultService, audit_repo: InMemoryAuditRepository) -
         AuthzService(),
         unsealed_vault,
         FakeClock(),
-        AuditLogger(audit_repo, FakeClock()),
+        AuditLogger(audit_repo, FakeClock(), create_metrics()),
     )
 
 
@@ -154,7 +155,7 @@ def test_create_key_requires_unsealed_vault(
         AuthzService(),
         unsealed_vault,
         FakeClock(),
-        AuditLogger(audit_repo, FakeClock()),
+        AuditLogger(audit_repo, FakeClock(), create_metrics()),
     )
     with pytest.raises(VaultNotInitialized):
         transit.create_key(ALICE, "app-1")

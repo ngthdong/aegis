@@ -7,14 +7,16 @@ from aegis.audit.models import AuditEvent, AuditOutcome
 from aegis.audit.repository import AuditRepository
 from aegis.common.clock import Clock
 from aegis.common.logging import get_logger
+from aegis.common.metrics import Metrics
 
 logger = get_logger(__name__)
 
 
 class AuditLogger:
-    def __init__(self, repository: AuditRepository, clock: Clock) -> None:
+    def __init__(self, repository: AuditRepository, clock: Clock, metrics: Metrics) -> None:
         self._repository = repository
         self._clock = clock
+        self._metrics = metrics
 
     def record(
         self,
@@ -36,6 +38,7 @@ class AuditLogger:
             metadata=metadata or {},
         )
         self._repository.save(event)
+        self._increment_metric(action, outcome)
 
         log_fn = logger.info if outcome == "success" else logger.warning
         log_fn(
@@ -46,3 +49,13 @@ class AuditLogger:
             resource_type=resource_type,
             resource_id=resource_id,
         )
+
+    def _increment_metric(self, action: str, outcome: AuditOutcome) -> None:
+        if action.startswith("kv."):
+            self._metrics.kv_operations_total.labels(
+                action=action.removeprefix("kv."), outcome=outcome
+            ).inc()
+        elif action.startswith("transit."):
+            self._metrics.transit_operations_total.labels(
+                action=action.removeprefix("transit."), outcome=outcome
+            ).inc()

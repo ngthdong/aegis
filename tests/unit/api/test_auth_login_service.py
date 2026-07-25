@@ -12,6 +12,7 @@ from aegis.auth.service import (
 from aegis.auth.session_repository import InMemorySessionRepository
 from aegis.auth.session_service import SessionRevoked, SessionService
 from aegis.common.clock import FakeClock
+from aegis.common.metrics import create_metrics
 
 VALID_PASSWORD = "correct-horse-battery"
 
@@ -25,7 +26,7 @@ def clock() -> FakeClock:
 def auth_service(clock: FakeClock) -> AuthService:
     user_repo = InMemoryUserRepository()
     session_service = SessionService(InMemorySessionRepository(), clock)
-    return AuthService(user_repo, session_service, clock)
+    return AuthService(user_repo, session_service, clock, create_metrics())
 
 
 def test_login_with_correct_password_succeeds(auth_service: AuthService):
@@ -75,7 +76,6 @@ def test_lockout_expires_after_window_elapses(auth_service: AuthService, clock: 
 
     clock.advance(timedelta(minutes=15, seconds=1))
 
-    # Correct password now succeeds, the lockout window has passed.
     result = auth_service.login("alice", VALID_PASSWORD)
     assert result.token
 

@@ -9,6 +9,7 @@ from aegis.auth.password import hash_password, verify_password
 from aegis.auth.repository import UserRepository
 from aegis.auth.session_service import SessionService
 from aegis.common.clock import Clock
+from aegis.common.metrics import Metrics
 
 MIN_PASSWORD_LENGTH = 12
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -49,10 +50,12 @@ class AuthService:
         user_repository: UserRepository,
         session_service: SessionService,
         clock: Clock,
+        metrics: Metrics,
     ) -> None:
         self._user_repository = user_repository
         self._session_service = session_service
         self._clock = clock
+        self._metrics = metrics
 
     def register(self, username: str, password: str) -> str:
         if len(password) < MIN_PASSWORD_LENGTH:
@@ -77,10 +80,12 @@ class AuthService:
 
         if user is None:
             verify_password(password, _DUMMY_PASSWORD_HASH)
+            self._metrics.auth_failures_total.inc()
             raise InvalidCredentials("invalid username or password")
 
         now = self._clock.now()
         if user.locked_until is not None and now < user.locked_until:
+            self._metrics.auth_failures_total.inc()
             raise AccountLocked(user.locked_until)
 
         if not verify_password(password, user.password_hash):
@@ -89,6 +94,7 @@ class AuthService:
                 now + LOCKOUT_DURATION if new_count >= MAX_FAILED_LOGIN_ATTEMPTS else None
             )
             self._user_repository.update_login_state(user.id, new_count, locked_until)
+            self._metrics.auth_failures_total.inc()
             if locked_until is not None:
                 raise AccountLocked(locked_until)
             raise InvalidCredentials("invalid username or password")

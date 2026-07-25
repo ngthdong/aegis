@@ -8,7 +8,7 @@ from aegis.api.dependencies import (
     BearerCredentials,
     CurrentPrincipal,
     RequireVaultUnsealed,
-    SessionServiceDep,
+    SessionServiceDependency,
 )
 from aegis.auth.session_service import SessionExpired, SessionNotFound, SessionRevoked
 from aegis.common.errors import InvalidSessionError
@@ -59,7 +59,7 @@ async def login(body: LoginRequest, auth_service: AuthServiceDependency) -> Logi
 @router.post("/logout", status_code=204)
 async def logout(
     credentials: BearerCredentials,
-    session_service: SessionServiceDep,
+    session_service: SessionServiceDependency,
 ) -> None:
     if credentials is None:
         raise InvalidSessionError("missing bearer token")

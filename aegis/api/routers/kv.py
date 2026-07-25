@@ -4,7 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from aegis.api.dependencies import CurrentPrincipal, KvServiceDep, RequireVaultUnsealed
+from aegis.api.dependencies import CurrentPrincipal, KvServiceDependency, RequireVaultUnsealed
 
 router = APIRouter(prefix="/v1/kv", tags=["kv"])
 
@@ -14,7 +14,7 @@ async def write_secret(
     path: str,
     value: dict[str, Any],
     principal: CurrentPrincipal,
-    kv: KvServiceDep,
+    kv: KvServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> None:
     kv.write(principal, path, value)
@@ -24,7 +24,7 @@ async def write_secret(
 async def read_secret(
     path: str,
     principal: CurrentPrincipal,
-    kv: KvServiceDep,
+    kv: KvServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> dict[str, Any]:
     return kv.read(principal, path)
@@ -34,7 +34,7 @@ async def read_secret(
 async def delete_secret(
     path: str,
     principal: CurrentPrincipal,
-    kv: KvServiceDep,
+    kv: KvServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> None:
     kv.delete(principal, path)

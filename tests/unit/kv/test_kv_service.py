@@ -7,6 +7,7 @@ from aegis.audit.repository import InMemoryAuditRepository
 from aegis.auth.session_service import Principal
 from aegis.authz.service import AuthzService, PermissionDenied
 from aegis.common.clock import FakeClock
+from aegis.common.metrics import create_metrics
 from aegis.core.repository import InMemoryVaultRepository
 from aegis.core.service import VaultService
 from aegis.kv.repository import InMemorySecretRepository
@@ -36,7 +37,7 @@ def kv(unsealed_vault: VaultService, audit_repo: InMemoryAuditRepository) -> KvS
         AuthzService(),
         unsealed_vault,
         FakeClock(),
-        AuditLogger(audit_repo, FakeClock()),
+        AuditLogger(audit_repo, FakeClock(), create_metrics()),
     )
 
 
@@ -124,7 +125,7 @@ def test_write_requires_unsealed_vault(unsealed_vault: VaultService):
         AuthzService(),
         unsealed_vault,
         FakeClock(),
-        AuditLogger(InMemoryAuditRepository(), FakeClock()),
+        AuditLogger(InMemoryAuditRepository(), FakeClock(), create_metrics()),
     )
     with pytest.raises(VaultNotInitialized):
         kv.write(ALICE, "secret/path", {"value": "x"})

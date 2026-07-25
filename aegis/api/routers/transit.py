@@ -5,7 +5,7 @@ import base64
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from aegis.api.dependencies import CurrentPrincipal, RequireVaultUnsealed, TransitServiceDep
+from aegis.api.dependencies import CurrentPrincipal, RequireVaultUnsealed, TransitServiceDependency
 from aegis.transit.models import TransitKeyType
 
 router = APIRouter(prefix="/v1/transit/keys", tags=["transit"])
@@ -57,7 +57,7 @@ class VerifyResponse(BaseModel):
 async def create_key(
     name: str,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
     body: CreateKeyRequest | None = None,
 ) -> CreateKeyResponse:
@@ -71,7 +71,7 @@ async def encrypt(
     name: str,
     body: EncryptRequest,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> EncryptResponse:
     plaintext = base64.b64decode(body.plaintext)
@@ -84,7 +84,7 @@ async def decrypt(
     name: str,
     body: DecryptRequest,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> DecryptResponse:
     plaintext = transit.decrypt(principal, name, body.ciphertext)
@@ -96,7 +96,7 @@ async def sign(
     name: str,
     body: SignRequest,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> SignResponse:
     message = base64.b64decode(body.message)
@@ -109,7 +109,7 @@ async def verify(
     name: str,
     body: VerifyRequest,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> VerifyResponse:
     message = base64.b64decode(body.message)
@@ -121,7 +121,7 @@ async def verify(
 async def disable(
     name: str,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> None:
     transit.disable_key(principal, name)
@@ -131,7 +131,7 @@ async def disable(
 async def destroy(
     name: str,
     principal: CurrentPrincipal,
-    transit: TransitServiceDep,
+    transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
 ) -> None:
     transit.destroy_key(principal, name)
