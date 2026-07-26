@@ -1,0 +1,27 @@
+services:
+  aegis:
+    container_name: aegis
+    build: .
+    restart: unless-stopped
+    init: true
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      AEGIS_ENVIRONMENT: production
+      AEGIS_DATABASE_PATH: /app/data/aegis.db
+      AEGIS_LOG_JSON: "true"
+      AEGIS_LOG_LEVEL: INFO
+
+    volumes:
+      - aegis-data:/app/data
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  aegis-data:
