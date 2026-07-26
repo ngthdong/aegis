@@ -51,3 +51,6 @@ Thumbs.db
 
 # Vault data
 data/
+
+# Benchmark
+benchmarks/
