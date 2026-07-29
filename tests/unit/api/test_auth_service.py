@@ -1,5 +1,7 @@
 import pytest
 
+from aegis.audit.logger import AuditLogger
+from aegis.audit.repository import InMemoryAuditRepository
 from aegis.auth.repository import InMemoryUserRepository
 from aegis.auth.service import AuthService, UsernameTaken, WeakPassword
 from aegis.auth.session_repository import InMemorySessionRepository
@@ -12,7 +14,12 @@ from aegis.common.metrics import create_metrics
 def auth_service() -> AuthService:
     clock = FakeClock()
     session_service = SessionService(InMemorySessionRepository(), clock)
-    return AuthService(InMemoryUserRepository(), session_service, clock, create_metrics())
+    audit = AuditLogger(
+        InMemoryAuditRepository(),
+        clock,
+        create_metrics(),
+    )
+    return AuthService(InMemoryUserRepository(), session_service, clock, create_metrics(), audit)
 
 
 def test_register_returns_a_user_id(auth_service: AuthService):

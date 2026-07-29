@@ -47,7 +47,11 @@ def get_auth_service(request: Request) -> AuthService:
     user_repository = SqlUserRepository(request.app.state.session_factory)
     session_service = get_session_service(request)
     return AuthService(
-        user_repository, session_service, request.app.state.clock, request.app.state.metrics
+        user_repository,
+        session_service,
+        request.app.state.clock,
+        request.app.state.metrics,
+        get_audit_logger(request),
     )
 
 
