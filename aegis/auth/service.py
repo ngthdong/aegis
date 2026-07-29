@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from aegis.audit.logger import AuditLogger
 from aegis.auth.models import User
 from aegis.auth.password import hash_password, verify_password
 from aegis.auth.repository import UserRepository
@@ -13,7 +14,9 @@ from aegis.common.metrics import Metrics
 
 MIN_PASSWORD_LENGTH = 12
 MAX_FAILED_LOGIN_ATTEMPTS = 5
-LOCKOUT_DURATION = timedelta(minutes=15)
+LOCKOUT_DURATION = timedelta(minutes=5)
+
+_RESOURCE_TYPE = "user"
 
 _DUMMY_PASSWORD_HASH = hash_password("dummy-password-used-only-for-timing-uniformity")
 
@@ -51,11 +54,13 @@ class AuthService:
         session_service: SessionService,
         clock: Clock,
         metrics: Metrics,
+        audit: AuditLogger,
     ) -> None:
         self._user_repository = user_repository
         self._session_service = session_service
         self._clock = clock
         self._metrics = metrics
+        self._audit = audit
 
     def register(self, username: str, password: str) -> str:
         if len(password) < MIN_PASSWORD_LENGTH:
@@ -81,11 +86,29 @@ class AuthService:
         if user is None:
             verify_password(password, _DUMMY_PASSWORD_HASH)
             self._metrics.auth_failures_total.inc()
+            self._audit.record(
+                principal_id=None,
+                action="auth.login",
+                resource_type=_RESOURCE_TYPE,
+                resource_id=username,
+                outcome="denied",
+                metadata={"reason": "invalid_credentials"},
+            )
+
             raise InvalidCredentials("invalid username or password")
 
         now = self._clock.now()
         if user.locked_until is not None and now < user.locked_until:
             self._metrics.auth_failures_total.inc()
+            self._audit.record(
+                principal_id=user.id,
+                action="auth.login",
+                resource_type=_RESOURCE_TYPE,
+                resource_id=username,
+                outcome="denied",
+                metadata={"reason": "locked", "locked_until": user.locked_until.isoformat()},
+            )
+
             raise AccountLocked(user.locked_until)
 
         if not verify_password(password, user.password_hash):
@@ -95,6 +118,18 @@ class AuthService:
             )
             self._user_repository.update_login_state(user.id, new_count, locked_until)
             self._metrics.auth_failures_total.inc()
+            self._audit.record(
+                principal_id=user.id,
+                action="auth.login",
+                resource_type=_RESOURCE_TYPE,
+                resource_id=username,
+                outcome="denied",
+                metadata={
+                    "reason": "locked" if locked_until is not None else "invalid_credentials",
+                    "failed_login_count": new_count,
+                },
+            )
+
             if locked_until is not None:
                 raise AccountLocked(locked_until)
             raise InvalidCredentials("invalid username or password")
@@ -104,6 +139,14 @@ class AuthService:
 
         token = self._session_service.create(user.id, user.username)
         expires_at = self._clock.now() + self._session_service.ttl
+        self._audit.record(
+            principal_id=user.id,
+            action="auth.login",
+            resource_type=_RESOURCE_TYPE,
+            resource_id=username,
+            outcome="success",
+        )
+
         return LoginResult(token=token, expires_at=expires_at)
 
     def logout(self, token: str) -> None:

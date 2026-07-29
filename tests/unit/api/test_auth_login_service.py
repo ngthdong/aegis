@@ -2,6 +2,8 @@ from datetime import timedelta
 
 import pytest
 
+from aegis.audit.logger import AuditLogger
+from aegis.audit.repository import InMemoryAuditRepository
 from aegis.auth.repository import InMemoryUserRepository
 from aegis.auth.service import (
     MAX_FAILED_LOGIN_ATTEMPTS,
@@ -26,7 +28,12 @@ def clock() -> FakeClock:
 def auth_service(clock: FakeClock) -> AuthService:
     user_repo = InMemoryUserRepository()
     session_service = SessionService(InMemorySessionRepository(), clock)
-    return AuthService(user_repo, session_service, clock, create_metrics())
+    audit = AuditLogger(
+        InMemoryAuditRepository(),
+        clock,
+        create_metrics(),
+    )
+    return AuthService(user_repo, session_service, clock, create_metrics(), audit)
 
 
 def test_login_with_correct_password_succeeds(auth_service: AuthService):
