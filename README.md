@@ -54,7 +54,7 @@ Aegis is a secret management and cryptographic service inspired by HashiCorp Vau
 | Method | Endpoint | Decription |
 |--------|----------|------------|
 | PUT    | /v1/kv/{path} | Encrypts and stores a JSON secret at the specified path. |
-| GET    | /v1/kv/{path} | Retrieves and decrypts a secret from the specified path. |
+| GET    | /v1/kv/{path}?version=N | Retrieves and decrypts a secret from the specified path. |
 | DELETE | /v1/kv/{path} | Permanently deletes a secret. |
 
 #### Key Management
@@ -82,3 +82,79 @@ Aegis is a secret management and cryptographic service inspired by HashiCorp Vau
 
 ---
 
+## Getting Started
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/ngthdong/aegis.git
+cd aegis
+```
+
+Create a virtual environment:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -e ".[dev]"
+```
+
+### Running the Service
+
+Start the API server:
+
+```bash
+uvicorn aegis.api.app:app --reload
+```
+
+The service will be available at:
+
+```
+http://127.0.0.1:8000
+```
+---
+
+## Running Tests
+
+Run all tests:
+
+```bash
+pytest
+```
+
+Run tests with coverage:
+
+```bash
+pytest --cov=aegis
+```
+
+Static analysis:
+
+```bash
+ruff check .
+ruff format .
+mypy aegis
+```
+
+---
+
+## Running with Docker
+
+Build and start the service:
+
+```bash
+docker compose up --build
+```
+
+The API will be available at:
+
+```
+http://localhost:8000
+```
