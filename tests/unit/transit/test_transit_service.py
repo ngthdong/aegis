@@ -10,12 +10,16 @@ from aegis.common.clock import FakeClock
 from aegis.common.metrics import create_metrics
 from aegis.core.repository import InMemoryVaultRepository
 from aegis.core.service import VaultService
+from aegis.transit.models import DIGEST_LENGTH_BYTES
 from aegis.transit.repository import InMemoryTransitKeyRepository
 from aegis.transit.service import (
+    InvalidMessageType,
     TransitDecryptionFailed,
     TransitKeyAlreadyExists,
     TransitKeyNotFound,
     TransitService,
+    VerifyResult,
+    WrongKeyType,
 )
 
 ALICE = Principal(user_id="user-alice", username="alice")
@@ -186,3 +190,99 @@ def test_denied_encrypt_produces_denied_audit_event(
     assert len(audit_repo.events) == 1
     assert audit_repo.events[0].outcome == "denied"
     assert audit_repo.events[0].principal_id == BOB.user_id
+
+
+def test_verify_returns_structured_result_not_a_bare_bool(transit: TransitService):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+    signature = transit.sign(ALICE, "doc-signer", b"message")
+
+    result = transit.verify(ALICE, "doc-signer", b"message", signature)
+
+    assert isinstance(result, VerifyResult)
+    assert result.key_name == "doc-signer"
+    assert result.signature_valid is True
+    assert result.signing_algorithm == "Ed25519"
+
+
+def test_verify_result_reports_false_for_tampered_message_not_an_exception(
+    transit: TransitService,
+):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+    signature = transit.sign(ALICE, "doc-signer", b"original")
+
+    result = transit.verify(ALICE, "doc-signer", b"tampered", signature)
+
+    assert result.signature_valid is False
+    assert result.key_name == "doc-signer"
+    assert result.signing_algorithm == "Ed25519"
+
+
+def test_raw_message_type_is_the_default_and_matches_prior_behavior(transit: TransitService):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+    signature = transit.sign(ALICE, "doc-signer", b"a normal document")
+    result = transit.verify(ALICE, "doc-signer", b"a normal document", signature)
+    assert result.signature_valid is True
+
+
+def test_digest_mode_requires_hash_algorithm(transit: TransitService):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+    digest = b"\x00" * 32
+
+    with pytest.raises(InvalidMessageType, match="hash_algorithm is required"):
+        transit.sign(ALICE, "doc-signer", digest, message_type="DIGEST")
+
+
+def test_raw_mode_rejects_a_hash_algorithm_being_supplied(transit: TransitService):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+
+    with pytest.raises(InvalidMessageType, match="must not be supplied"):
+        transit.sign(ALICE, "doc-signer", b"a message", message_type="RAW", hash_algorithm="SHA256")
+
+
+def test_digest_mode_rejects_wrong_length_for_claimed_algorithm(transit: TransitService):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+    wrong_length_digest = b"\x00" * 20
+
+    with pytest.raises(InvalidMessageType, match="does not match expected"):
+        transit.sign(
+            ALICE,
+            "doc-signer",
+            wrong_length_digest,
+            message_type="DIGEST",
+            hash_algorithm="SHA256",
+        )
+
+
+@pytest.mark.parametrize("algorithm", ["SHA256", "SHA512"])
+def test_digest_mode_accepts_correctly_sized_digest_for_each_supported_algorithm(
+    transit: TransitService, algorithm: str
+):
+    transit.create_key(ALICE, "doc-signer", key_type="asymmetric_sign")
+    digest = b"\x42" * DIGEST_LENGTH_BYTES[algorithm]
+
+    signature = transit.sign(
+        ALICE, "doc-signer", digest, message_type="DIGEST", hash_algorithm=algorithm
+    )
+    result = transit.verify(
+        ALICE, "doc-signer", digest, signature, message_type="DIGEST", hash_algorithm=algorithm
+    )
+    assert result.signature_valid is True
+
+
+def test_message_type_validation_happens_before_any_key_lookup(transit: TransitService):
+    with pytest.raises(InvalidMessageType):
+        transit.sign(
+            ALICE, "this-key-does-not-exist", b"x", message_type="RAW", hash_algorithm="SHA256"
+        )
+
+
+def test_signing_operation_rejected_on_a_symmetric_key(transit: TransitService):
+    transit.create_key(ALICE, "sym-key", key_type="symmetric")
+    with pytest.raises(WrongKeyType):
+        transit.sign(ALICE, "sym-key", b"message")
+
+
+def test_encrypt_rejected_on_a_signing_key(transit: TransitService):
+    transit.create_key(ALICE, "sig-key", key_type="asymmetric_sign")
+    with pytest.raises(WrongKeyType):
+        transit.encrypt(ALICE, "sig-key", b"data")

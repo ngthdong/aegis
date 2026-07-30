@@ -35,10 +35,15 @@ def test_create_signing_key_sign_and_verify_over_http(client: TestClient):
     headers = _auth_header(token)
 
     resp = client.post(
-        "/v1/transit/keys/doc-signer", json={"key_type": "asymmetric_sign"}, headers=headers
+        "/v1/transit/keys/doc-signer",
+        json={"key_usage": "SIGN_VERIFY"},
+        headers=headers,
     )
     assert resp.status_code == 201
-    assert resp.json()["key_type"] == "asymmetric_sign"
+    assert resp.json() == {
+        "name": "doc-signer",
+        "key_type": "SIGN_VERIFY",
+    }
 
     resp = client.post(
         "/v1/transit/keys/doc-signer/sign",
@@ -54,7 +59,11 @@ def test_create_signing_key_sign_and_verify_over_http(client: TestClient):
         headers=headers,
     )
     assert resp.status_code == 200
-    assert resp.json() == {"valid": True}
+    assert resp.json() == {
+        "valid": True,
+        "signature_valid": True,
+        "signing_algorithm": "Ed25519",
+    }
 
 
 def test_verify_returns_false_not_an_error_for_tampered_message(client: TestClient):
@@ -62,8 +71,10 @@ def test_verify_returns_false_not_an_error_for_tampered_message(client: TestClie
     token = _register_and_login(client, "alice")
     headers = _auth_header(token)
 
-    client.post(
-        "/v1/transit/keys/doc-signer", json={"key_type": "asymmetric_sign"}, headers=headers
+    resp = client.post(
+        "/v1/transit/keys/doc-signer",
+        json={"key_usage": "SIGN_VERIFY"},
+        headers=headers,
     )
     resp = client.post(
         "/v1/transit/keys/doc-signer/sign",
@@ -78,7 +89,11 @@ def test_verify_returns_false_not_an_error_for_tampered_message(client: TestClie
         headers=headers,
     )
     assert resp.status_code == 200
-    assert resp.json() == {"valid": False}
+    assert resp.json() == {
+        "valid": False,
+        "signature_valid": False,
+        "signing_algorithm": "Ed25519",
+    }
 
 
 def test_non_owner_can_verify_over_http_but_not_sign(client: TestClient):
@@ -88,7 +103,7 @@ def test_non_owner_can_verify_over_http_but_not_sign(client: TestClient):
 
     client.post(
         "/v1/transit/keys/doc-signer",
-        json={"key_type": "asymmetric_sign"},
+        json={"key_usage": "SIGN_VERIFY"},
         headers=_auth_header(alice_token),
     )
     resp = client.post(
@@ -111,7 +126,11 @@ def test_non_owner_can_verify_over_http_but_not_sign(client: TestClient):
         headers=_auth_header(bob_token),
     )
     assert resp.status_code == 200
-    assert resp.json() == {"valid": True}
+    assert resp.json() == {
+        "valid": True,
+        "signature_valid": True,
+        "signing_algorithm": "Ed25519",
+    }
 
 
 def test_disable_then_encrypt_returns_409_but_decrypt_still_works(client: TestClient):
