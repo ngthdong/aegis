@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, LargeBinary, String
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -68,11 +75,35 @@ class SecretRow(Base):
     path: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     owner_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
 
+    current_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    @property
+    def created_at_dt(self) -> datetime:
+        return datetime.fromisoformat(self.created_at)
+
+
+class SecretVersionRow(Base):
+    __tablename__ = "secret_versions"
+    __table_args__ = (
+        UniqueConstraint("secret_id", "version", name="uq_secret_versions_secret_id_version"),
+        CheckConstraint("version >= 1", name="ck_secret_versions_version_positive"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    secret_id: Mapped[str] = mapped_column(
+        String, ForeignKey("secrets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+
     nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
     created_at: Mapped[str] = mapped_column(String, nullable=False)
-    updated_at: Mapped[str] = mapped_column(String, nullable=False)
 
 
 class AuditLogRow(Base):

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from aegis.storage.models import SecretVersionRow
+
 PASSPHRASE = "correct horse battery staple"
 PASSWORD = "correct-horse-battery"
 
@@ -145,13 +147,22 @@ def test_tampered_row_over_real_sqlite_returns_500(client: TestClient):
 
     session_factory = client.app.state.session_factory
     with session_factory() as session:
-        row = session.execute(
+        secret = session.execute(
             select(SecretRow).where(SecretRow.path == "tamper/target")
         ).scalar_one()
-        tampered = bytearray(row.ciphertext)
-        tampered[0] ^= 0xFF
-        row.ciphertext = bytes(tampered)
-        session.commit()
+
+    version = session.execute(
+        select(SecretVersionRow).where(
+            SecretVersionRow.secret_id == secret.id,
+            SecretVersionRow.version == secret.current_version,
+        )
+    ).scalar_one()
+
+    tampered = bytearray(version.ciphertext)
+    tampered[0] ^= 0xFF
+    version.ciphertext = bytes(tampered)
+
+    session.commit()
 
     resp = client.get("/v1/kv/tamper/target", headers=headers)
     assert resp.status_code == 500

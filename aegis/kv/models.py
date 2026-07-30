@@ -11,6 +11,15 @@ class Secret:
     id: str
     path: str
     owner_id: str
-    envelope: Envelope
+    current_version: int
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class SecretVersion:
+    id: str
+    secret_id: str
+    version: int
+    envelope: Envelope
+    created_at: datetime

@@ -11,7 +11,7 @@ from aegis.common.clock import Clock
 from aegis.core.service import VaultService
 from aegis.crypto.aead import DecryptionError, encrypt
 from aegis.crypto.aead import decrypt as aead_decrypt
-from aegis.kv.models import Secret
+from aegis.kv.models import Secret, SecretVersion
 from aegis.kv.repository import SecretRepository
 
 _RESOURCE_TYPE = "secret"
@@ -21,12 +21,16 @@ class SecretNotFound(Exception):
     pass
 
 
+class SecretVersionNotFound(Exception):
+    pass
+
+
 class SecretCorrupted(Exception):
     pass
 
 
-def _aad(owner_id: str, path: str) -> bytes:
-    return f"{owner_id}:{path}".encode()
+def _aad(owner_id: str, path: str, version: int) -> bytes:
+    return f"{owner_id}:{path}:{version}".encode()
 
 
 class KvService:
@@ -61,7 +65,7 @@ class KvService:
             metadata=metadata,
         )
 
-    def write(self, principal: Principal, path: str, value: dict[str, Any]) -> None:
+    def write(self, principal: Principal, path: str, value: dict[str, Any]) -> int:
         existing = self._repository.get_by_path(path)
         now = self._clock.now()
 
@@ -72,28 +76,44 @@ class KvService:
                 self._record(principal, "kv.write", path, "denied")
                 raise
             owner_id = existing.owner_id
-            created_at = existing.created_at
+            new_version_number = existing.current_version + 1
+            secret_id = existing.id
         else:
             owner_id = principal.user_id
-            created_at = now
+            new_version_number = 1
+            secret_id = uuid.uuid4().hex
 
         dek = self._vault.get_dek()
         plaintext = json.dumps(value).encode("utf-8")
-        envelope = encrypt(dek, plaintext, aad=_aad(owner_id, path))
+        envelope = encrypt(dek, plaintext, aad=_aad(owner_id, path, new_version_number))
 
-        self._repository.save(
-            Secret(
-                id=existing.id if existing is not None else uuid.uuid4().hex,
-                path=path,
-                owner_id=owner_id,
+        if existing is None:
+            self._repository.create_secret(
+                Secret(
+                    id=secret_id,
+                    path=path,
+                    owner_id=owner_id,
+                    current_version=1,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        self._repository.add_version(
+            SecretVersion(
+                id=uuid.uuid4().hex,
+                secret_id=secret_id,
+                version=new_version_number,
                 envelope=envelope,
-                created_at=created_at,
-                updated_at=now,
+                created_at=now,
             )
         )
-        self._record(principal, "kv.write", path, "success")
+        if existing is not None:
+            self._repository.bump_current_version(secret_id, new_version_number, now)
 
-    def read(self, principal: Principal, path: str) -> dict[str, Any]:
+        self._record(principal, "kv.write", path, "success", {"version": new_version_number})
+        return new_version_number
+
+    def read(self, principal: Principal, path: str, version: int | None = None) -> dict[str, Any]:
         secret = self._repository.get_by_path(path)
         if secret is None:
             self._record(principal, "kv.read", path, "error", {"reason": "not_found"})
@@ -105,14 +125,36 @@ class KvService:
             self._record(principal, "kv.read", path, "denied")
             raise
 
+        target_version = version if version is not None else secret.current_version
+        version_row = self._repository.get_version(secret.id, target_version)
+        if version_row is None:
+            self._record(
+                principal,
+                "kv.read",
+                path,
+                "error",
+                {"reason": "version_not_found", "version": target_version},
+            )
+            raise SecretVersionNotFound(f"path '{path}' has no version {target_version}")
+
         dek = self._vault.get_dek()
         try:
-            plaintext = aead_decrypt(dek, secret.envelope, aad=_aad(secret.owner_id, path))
+            plaintext = aead_decrypt(
+                dek, version_row.envelope, aad=_aad(secret.owner_id, path, target_version)
+            )
         except DecryptionError as exc:
-            self._record(principal, "kv.read", path, "error", {"reason": "corrupted"})
-            raise SecretCorrupted(f"secret at path '{path}' failed integrity verification") from exc
+            self._record(
+                principal,
+                "kv.read",
+                path,
+                "error",
+                {"reason": "corrupted", "version": target_version},
+            )
+            raise SecretCorrupted(
+                f"secret at path '{path}' version {target_version} failed integrity verification"
+            ) from exc
 
-        self._record(principal, "kv.read", path, "success")
+        self._record(principal, "kv.read", path, "success", {"version": target_version})
 
         return cast(dict[str, Any], json.loads(plaintext))
 
@@ -129,4 +171,6 @@ class KvService:
             raise
 
         self._repository.delete(path)
-        self._record(principal, "kv.delete", path, "success")
+        self._record(
+            principal, "kv.delete", path, "success", {"versions_deleted": secret.current_version}
+        )
