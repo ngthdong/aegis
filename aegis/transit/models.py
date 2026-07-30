@@ -8,6 +8,14 @@ from aegis.crypto.aead import Envelope
 
 TransitKeyType = Literal["symmetric", "asymmetric_sign"]
 
+MessageType = Literal["RAW", "DIGEST"]
+HashAlgorithm = Literal["SHA256", "SHA512"]
+
+DIGEST_LENGTH_BYTES: dict[HashAlgorithm, int] = {
+    "SHA256": 32,
+    "SHA512": 64,
+}
+
 
 @dataclass(frozen=True, slots=True)
 class TransitKey:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from aegis.audit.logger import AuditLogger
@@ -15,7 +16,13 @@ from aegis.crypto.random import generate_dek as generate_aes_key
 from aegis.crypto.signing import generate_keypair
 from aegis.crypto.signing import sign as ed25519_sign
 from aegis.crypto.signing import verify as ed25519_verify
-from aegis.transit.models import TransitKey, TransitKeyType
+from aegis.transit.models import (
+    DIGEST_LENGTH_BYTES,
+    HashAlgorithm,
+    MessageType,
+    TransitKey,
+    TransitKeyType,
+)
 from aegis.transit.repository import TransitKeyRepository
 
 _RESOURCE_TYPE = "transit_key"
@@ -45,8 +52,38 @@ class TransitDecryptionFailed(Exception):
     pass
 
 
+class InvalidMessageType(Exception):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class VerifyResult:
+    key_name: str
+    signature_valid: bool
+    signing_algorithm: str
+
+
 def _wrap_aad(owner_id: str, name: str) -> bytes:
     return f"transit-key:{owner_id}:{name}".encode()
+
+
+def _validate_message_type_and_digest(
+    message: bytes, message_type: MessageType, hash_algorithm: HashAlgorithm | None
+) -> None:
+    if message_type == "RAW":
+        if hash_algorithm is not None:
+            raise InvalidMessageType("hash_algorithm must not be supplied when message_type is RAW")
+        return
+
+    if hash_algorithm is None:
+        raise InvalidMessageType("hash_algorithm is required when message_type is DIGEST")
+
+    expected_length = DIGEST_LENGTH_BYTES[hash_algorithm]
+    if len(message) != expected_length:
+        raise InvalidMessageType(
+            f"message length {len(message)} does not match expected "
+            f"{hash_algorithm} digest length of {expected_length} bytes"
+        )
 
 
 class TransitService:
@@ -96,7 +133,7 @@ class TransitService:
             raw_key = generate_aes_key()
             wrapped = encrypt(dek, raw_key, aad=aad)
             public_key = None
-        else:  # "asymmetric_sign"
+        else:
             keypair = generate_keypair()
             wrapped = encrypt(dek, keypair.private_key_bytes, aad=aad)
             public_key = keypair.public_key_bytes
@@ -135,7 +172,6 @@ class TransitService:
             require_ownership=True,
             allow_disabled=True,
         )
-
         raw = base64.b64decode(ciphertext_b64)
         nonce, ciphertext = raw[:NONCE_LENGTH_BYTES], raw[NONCE_LENGTH_BYTES:]
         try:
@@ -151,15 +187,40 @@ class TransitService:
         self._record(principal, "transit.decrypt", name, "success")
         return plaintext
 
-    def sign(self, principal: Principal, name: str, message: bytes) -> str:
+    def sign(
+        self,
+        principal: Principal,
+        name: str,
+        message: bytes,
+        message_type: MessageType = "RAW",
+        hash_algorithm: HashAlgorithm | None = None,
+    ) -> str:
+        _validate_message_type_and_digest(message, message_type, hash_algorithm)
+
         private_key_bytes = self._load_wrapped_secret_for_use(
             principal, "sign", name, expected_type="asymmetric_sign", require_ownership=True
         )
         signature = ed25519_sign(private_key_bytes, message)
-        self._record(principal, "transit.sign", name, "success")
+        self._record(
+            principal,
+            "transit.sign",
+            name,
+            "success",
+            {"message_type": message_type, "hash_algorithm": hash_algorithm},
+        )
         return base64.b64encode(signature).decode("ascii")
 
-    def verify(self, principal: Principal, name: str, message: bytes, signature_b64: str) -> bool:
+    def verify(
+        self,
+        principal: Principal,
+        name: str,
+        message: bytes,
+        signature_b64: str,
+        message_type: MessageType = "RAW",
+        hash_algorithm: HashAlgorithm | None = None,
+    ) -> VerifyResult:
+        _validate_message_type_and_digest(message, message_type, hash_algorithm)
+
         key = self._repository.get_by_name(name)
         if key is None:
             self._record(principal, "transit.verify", name, "error", {"reason": "not_found"})
@@ -173,18 +234,19 @@ class TransitService:
             self._record(principal, "transit.verify", name, "error", {"reason": "destroyed"})
             raise TransitKeyDestroyed(f"transit key '{name}' has been destroyed")
 
-        assert key.public_key is not None  # invariant: non-destroyed signing key always has one
+        assert key.public_key is not None
 
         is_valid = ed25519_verify(key.public_key, message, base64.b64decode(signature_b64))
         self._record(principal, "transit.verify", name, "success", {"signature_valid": is_valid})
-        return is_valid
+        return VerifyResult(
+            key_name=name, signature_valid=is_valid, signing_algorithm=key.algorithm
+        )
 
     def disable_key(self, principal: Principal, name: str) -> None:
         key = self._get_owned_key(principal, "disable", name)
         if key.is_destroyed:
             self._record(principal, "transit.disable", name, "error", {"reason": "destroyed"})
             raise TransitKeyDestroyed(f"transit key '{name}' has been destroyed")
-
         self._repository.set_disabled(name, True)
         self._record(principal, "transit.disable", name, "success")
 
@@ -195,7 +257,6 @@ class TransitService:
                 principal, "transit.destroy", name, "error", {"reason": "already_destroyed"}
             )
             raise TransitKeyDestroyed(f"transit key '{name}' has already been destroyed")
-
         self._repository.destroy(name, self._clock.now())
         self._record(principal, "transit.destroy", name, "success")
 
@@ -204,13 +265,11 @@ class TransitService:
         if key is None:
             self._record(principal, f"transit.{action}", name, "error", {"reason": "not_found"})
             raise TransitKeyNotFound(f"no transit key named '{name}'")
-
         try:
             self._authz.require(principal, action, key)
         except PermissionDenied:
             self._record(principal, f"transit.{action}", name, "denied")
             raise
-
         return key
 
     def _load_wrapped_secret_for_use(
@@ -248,6 +307,6 @@ class TransitService:
             self._record(principal, f"transit.{action}", name, "error", {"reason": "disabled"})
             raise TransitKeyDisabled(f"transit key '{name}' is disabled")
 
-        assert key.wrapped_key is not None  # invariant: non-destroyed key always has one
+        assert key.wrapped_key is not None
         dek = self._vault.get_dek()
         return aead_decrypt(dek, key.wrapped_key, aad=_wrap_aad(key.owner_id, name))

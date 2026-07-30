@@ -51,13 +51,19 @@ def transit(unsealed_vault: VaultService, audit_repo: InMemoryAuditRepository) -
 def test_create_signing_key_then_sign_then_verify(transit: TransitService):
     transit.create_key(ALICE, "sig-1", key_type="asymmetric_sign")
     signature = transit.sign(ALICE, "sig-1", b"transfer $100")
-    assert transit.verify(ALICE, "sig-1", b"transfer $100", signature) is True
+    result = transit.verify(ALICE, "sig-1", b"transfer $100", signature)
+    assert result.signature_valid is True
+    assert result.key_name == "sig-1"
+    assert result.signing_algorithm == "Ed25519"
 
 
 def test_verify_fails_for_tampered_message(transit: TransitService):
     transit.create_key(ALICE, "sig-1", key_type="asymmetric_sign")
     signature = transit.sign(ALICE, "sig-1", b"original message")
-    assert transit.verify(ALICE, "sig-1", b"tampered message", signature) is False
+    result = transit.verify(ALICE, "sig-1", b"tampered message", signature)
+    assert result.signature_valid is False
+    assert result.key_name == "sig-1"
+    assert result.signing_algorithm == "Ed25519"
 
 
 def test_non_owner_cannot_sign(transit: TransitService):
@@ -69,8 +75,10 @@ def test_non_owner_cannot_sign(transit: TransitService):
 def test_non_owner_can_verify(transit: TransitService):
     transit.create_key(ALICE, "sig-1", key_type="asymmetric_sign")
     signature = transit.sign(ALICE, "sig-1", b"message")
-
-    assert transit.verify(BOB, "sig-1", b"message", signature) is True
+    result = transit.verify(BOB, "sig-1", b"message", signature)
+    assert result.signature_valid is True
+    assert result.key_name == "sig-1"
+    assert result.signing_algorithm == "Ed25519"
 
 
 def test_sign_rejects_a_symmetric_key(transit: TransitService):
@@ -120,7 +128,10 @@ def test_disabled_signing_key_blocks_new_signs_but_allows_verify(transit: Transi
     with pytest.raises(TransitKeyDisabled):
         transit.sign(ALICE, "sig-1", b"signed after disable")
 
-    assert transit.verify(ALICE, "sig-1", b"signed before disable", signature) is True
+    result = transit.verify(ALICE, "sig-1", b"signed before disable", signature)
+    assert result.signature_valid is True
+    assert result.key_name == "sig-1"
+    assert result.signing_algorithm == "Ed25519"
 
 
 def test_only_owner_can_disable(transit: TransitService):

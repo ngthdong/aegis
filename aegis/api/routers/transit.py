@@ -1,23 +1,38 @@
 from __future__ import annotations
 
 import base64
+from enum import StrEnum
+from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from aegis.api.dependencies import CurrentPrincipal, RequireVaultUnsealed, TransitServiceDependency
-from aegis.transit.models import TransitKeyType
+from aegis.transit.models import HashAlgorithm, MessageType
 
 router = APIRouter(prefix="/v1/transit/keys", tags=["transit"])
 
+KeyType = Literal["symmetric", "asymmetric_sign"]
+
+
+class KeyUsage(StrEnum):
+    ENCRYPT_DECRYPT = "ENCRYPT_DECRYPT"
+    SIGN_VERIFY = "SIGN_VERIFY"
+
+
+_KEY_USAGE_TO_KEY_TYPE: dict[KeyUsage, KeyType] = {
+    KeyUsage.ENCRYPT_DECRYPT: "symmetric",
+    KeyUsage.SIGN_VERIFY: "asymmetric_sign",
+}
+
 
 class CreateKeyRequest(BaseModel):
-    key_type: TransitKeyType = "symmetric"
+    key_usage: KeyUsage = KeyUsage.ENCRYPT_DECRYPT
 
 
 class CreateKeyResponse(BaseModel):
     name: str
-    key_type: TransitKeyType
+    key_type: KeyUsage
 
 
 class EncryptRequest(BaseModel):
@@ -38,6 +53,8 @@ class DecryptResponse(BaseModel):
 
 class SignRequest(BaseModel):
     message: str = Field(description="base64-encoded message bytes to sign")
+    message_type: MessageType = "RAW"
+    hash_algorithm: HashAlgorithm | None = None
 
 
 class SignResponse(BaseModel):
@@ -47,10 +64,14 @@ class SignResponse(BaseModel):
 class VerifyRequest(BaseModel):
     message: str = Field(description="base64-encoded message bytes")
     signature: str = Field(description="base64-encoded Ed25519 signature to check")
+    message_type: MessageType = "RAW"
+    hash_algorithm: HashAlgorithm | None = None
 
 
 class VerifyResponse(BaseModel):
     valid: bool
+    signature_valid: bool
+    signing_algorithm: str
 
 
 @router.post("/{name}", response_model=CreateKeyResponse, status_code=201)
@@ -61,9 +82,10 @@ async def create_key(
     _vault_unsealed: RequireVaultUnsealed,
     body: CreateKeyRequest | None = None,
 ) -> CreateKeyResponse:
-    key_type = body.key_type if body is not None else "symmetric"
+    key_usage = body.key_usage if body is not None else KeyUsage.ENCRYPT_DECRYPT
+    key_type = _KEY_USAGE_TO_KEY_TYPE[key_usage]
     transit.create_key(principal, name, key_type=key_type)
-    return CreateKeyResponse(name=name, key_type=key_type)
+    return CreateKeyResponse(name=name, key_type=key_usage)
 
 
 @router.post("/{name}/encrypt", response_model=EncryptResponse)
@@ -100,7 +122,13 @@ async def sign(
     _vault_unsealed: RequireVaultUnsealed,
 ) -> SignResponse:
     message = base64.b64decode(body.message)
-    signature = transit.sign(principal, name, message)
+    signature = transit.sign(
+        principal,
+        name,
+        message,
+        message_type=body.message_type,
+        hash_algorithm=body.hash_algorithm,
+    )
     return SignResponse(signature=signature)
 
 
@@ -113,8 +141,19 @@ async def verify(
     _vault_unsealed: RequireVaultUnsealed,
 ) -> VerifyResponse:
     message = base64.b64decode(body.message)
-    is_valid = transit.verify(principal, name, message, body.signature)
-    return VerifyResponse(valid=is_valid)
+    result = transit.verify(
+        principal,
+        name,
+        message,
+        body.signature,
+        message_type=body.message_type,
+        hash_algorithm=body.hash_algorithm,
+    )
+    return VerifyResponse(
+        valid=result.signature_valid,
+        signature_valid=result.signature_valid,
+        signing_algorithm=result.signing_algorithm,
+    )
 
 
 @router.post("/{name}/disable", status_code=204)
