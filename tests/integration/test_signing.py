@@ -99,9 +99,6 @@ def test_verify_rejects_a_symmetric_key(transit: TransitService):
         transit.verify(ALICE, "sym-1", b"message", base64.b64encode(b"x" * 64).decode())
 
 
-# --- Lifecycle: disable ---
-
-
 def test_disabled_key_blocks_new_encrypt(transit: TransitService):
     transit.create_key(ALICE, "app-1", key_type="symmetric")
     transit.disable_key(ALICE, "app-1")
@@ -174,10 +171,14 @@ def test_destroyed_key_row_survives_as_tombstone(transit: TransitService):
     transit.destroy_key(ALICE, "app-1")
 
     repo = transit._repository  # type: ignore[attr-defined]
+
     tombstone = repo.get_by_name("app-1")
     assert tombstone is not None
     assert tombstone.is_destroyed
-    assert tombstone.wrapped_key is None
+
+    version = repo.get_version(tombstone.id, 1)
+    assert version is not None
+    assert version.wrapped_key is None
 
 
 def test_only_owner_can_destroy(transit: TransitService):

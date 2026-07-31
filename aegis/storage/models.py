@@ -125,17 +125,35 @@ class TransitKeyRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     owner_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    key_type: Mapped[str] = mapped_column(String, nullable=False, default="symmetric")
     algorithm: Mapped[str] = mapped_column(String, nullable=False, default="AES-256-GCM")
 
-    key_type: Mapped[str] = mapped_column(String, nullable=False, default="symmetric")
+    current_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+    disabled: Mapped[bool] = mapped_column(nullable=False, default=False)
+    destroyed_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class TransitKeyVersionRow(Base):
+    __tablename__ = "transit_key_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "transit_key_id", "version", name="uq_transit_key_versions_key_id_version"
+        ),
+        CheckConstraint("version >= 1", name="ck_transit_key_versions_version_positive"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    transit_key_id: Mapped[str] = mapped_column(
+        String, ForeignKey("transit_keys.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
 
     key_nonce: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     wrapped_key_ciphertext: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-
     public_key: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-
-    disabled: Mapped[bool] = mapped_column(nullable=False, default=False)
-
-    destroyed_at: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[str] = mapped_column(String, nullable=False)
