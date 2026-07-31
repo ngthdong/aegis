@@ -111,7 +111,7 @@ pip install -e ".[dev]"
 Start the API server:
 
 ```bash
-uvicorn aegis.api.app:app --reload
+uvicorn aegis.api.main:app --reload
 ```
 
 The service will be available at:

@@ -156,6 +156,17 @@ async def verify(
     )
 
 
+@router.post("/{name}/rotate")
+async def rotate_key(
+    name: str,
+    principal: CurrentPrincipal,
+    transit: TransitServiceDependency,
+    _vault_unsealed: RequireVaultUnsealed,
+) -> dict[str, int]:
+    version = transit.rotate_key(principal, name)
+    return {"current_version": version}
+
+
 @router.post("/{name}/disable", status_code=204)
 async def disable(
     name: str,

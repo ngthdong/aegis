@@ -136,13 +136,26 @@ def test_wrapped_key_tamper_is_detected_on_next_use(transit: TransitService):
     from aegis.crypto.aead import DecryptionError, Envelope
 
     repo = transit._repository  # type: ignore[attr-defined]
-    stored = repo.get_by_name("app-1")
-    tampered_ciphertext = bytearray(stored.wrapped_key.ciphertext)
+
+    key = repo.get_by_name("app-1")
+    assert key is not None
+
+    version = repo.get_version(key.id, key.current_version)
+    assert version is not None
+    assert version.wrapped_key is not None
+
+    tampered_ciphertext = bytearray(version.wrapped_key.ciphertext)
     tampered_ciphertext[0] ^= 0xFF
-    tampered_envelope = Envelope(
-        nonce=stored.wrapped_key.nonce, ciphertext=bytes(tampered_ciphertext)
+
+    tampered_version = replace(
+        version,
+        wrapped_key=Envelope(
+            nonce=version.wrapped_key.nonce,
+            ciphertext=bytes(tampered_ciphertext),
+        ),
     )
-    repo.save(replace(stored, wrapped_key=tampered_envelope))
+
+    repo._versions[key.id][key.current_version] = tampered_version  # type: ignore[attr-defined]
 
     with pytest.raises(DecryptionError):
         transit.encrypt(ALICE, "app-1", b"data")
