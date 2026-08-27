@@ -14,7 +14,14 @@ def test_readiness_reports_not_ready_before_vault_is_unsealed(client):
 
 
 def test_readiness_reports_ready_once_vault_is_unsealed(client):
-    client.post("/v1/vault/init", json={"passphrase": "correct horse battery staple"})
+    client.post(
+        "/v1/vault/init",
+        json={
+            "passphrase": "correct horse battery staple",
+            "admin_username": "bootstrap-admin",
+            "admin_password": "correct-horse-battery-admin",
+        },
+    )
     client.post("/v1/vault/unseal", json={"passphrase": "correct horse battery staple"})
 
     response = client.get("/ready")

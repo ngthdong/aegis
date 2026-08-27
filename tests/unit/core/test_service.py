@@ -4,6 +4,7 @@ from aegis.core.repository import InMemoryVaultRepository
 from aegis.core.service import (
     InvalidPassphrase,
     VaultAlreadyInitialized,
+    VaultAlreadySealed,
     VaultNotInitialized,
     VaultService,
 )
@@ -62,6 +63,39 @@ def test_seal_discards_in_memory_dek(vault: VaultService) -> None:
 
     with pytest.raises(VaultNotInitialized):
         vault.get_dek()
+
+
+def test_seal_zeroizes_in_memory_dek(vault: VaultService) -> None:
+    """
+    seal() must not just drop the reference to the DEK; it must overwrite
+    the underlying buffer so the key material can't be recovered from the
+    process's memory after sealing.
+    """
+    vault.initialize("correct horse battery staple")
+    vault.unseal("correct horse battery staple")
+
+    dek_buffer = vault._dek  # type: ignore[attr-defined]
+    assert dek_buffer is not None
+    assert any(byte != 0 for byte in dek_buffer)
+
+    vault.seal()
+
+    assert vault._dek is None  # type: ignore[attr-defined]
+    assert all(byte == 0 for byte in dek_buffer)
+
+
+def test_seal_on_already_sealed_vault_raises(vault: VaultService) -> None:
+    vault.initialize("correct horse battery staple")
+    vault.unseal("correct horse battery staple")
+    vault.seal()
+
+    with pytest.raises(VaultAlreadySealed):
+        vault.seal()
+
+
+def test_seal_on_uninitialized_vault_raises(vault: VaultService) -> None:
+    with pytest.raises(VaultNotInitialized):
+        vault.seal()
 
 
 def test_get_dek_requires_unsealed_state(vault: VaultService) -> None:

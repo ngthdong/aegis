@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Protocol
 
+from aegis.auth.models import ROLE_USER
 from aegis.common.clock import Clock
 
 TOKEN_LENGTH_BYTES = 32
@@ -21,12 +22,14 @@ class SessionRecord:
     created_at: datetime
     expires_at: datetime
     revoked_at: datetime | None
+    role: str = ROLE_USER
 
 
 @dataclass(frozen=True, slots=True)
 class Principal:
     user_id: str
     username: str
+    role: str = ROLE_USER
 
 
 class SessionRepository(Protocol):
@@ -66,7 +69,7 @@ class SessionService:
     def ttl(self) -> timedelta:
         return self._ttl
 
-    def create(self, user_id: str, username: str) -> str:
+    def create(self, user_id: str, username: str, role: str = ROLE_USER) -> str:
         raw_token = secrets.token_urlsafe(TOKEN_LENGTH_BYTES)
         now = self._clock.now()
         record = SessionRecord(
@@ -77,6 +80,7 @@ class SessionService:
             created_at=now,
             expires_at=now + self._ttl,
             revoked_at=None,
+            role=role,
         )
         self._repository.save(record)
         return raw_token
@@ -90,7 +94,7 @@ class SessionService:
             raise SessionRevoked("session has been revoked")
         if self._clock.now() >= record.expires_at:
             raise SessionExpired("session has expired")
-        return Principal(user_id=record.user_id, username=record.username)
+        return Principal(user_id=record.user_id, username=record.username, role=record.role)
 
     def revoke(self, raw_token: str) -> None:
         token_hash = _hash_token(raw_token)

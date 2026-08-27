@@ -4,10 +4,19 @@ from fastapi.testclient import TestClient
 
 PASSPHRASE = "correct horse battery staple"
 PASSWORD = "correct-horse-battery"
+ADMIN_USERNAME = "bootstrap-admin"
+ADMIN_PASSWORD = "correct-horse-battery-admin"
 
 
 def _setup_vault(client: TestClient) -> None:
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post(
+        "/v1/vault/init",
+        json={
+            "passphrase": PASSPHRASE,
+            "admin_username": ADMIN_USERNAME,
+            "admin_password": ADMIN_PASSWORD,
+        },
+    )
     client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
 
 

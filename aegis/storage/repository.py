@@ -62,6 +62,16 @@ class SqlVaultRepository:
             uow.session.add(row)
             uow.commit()
 
+    def delete(self) -> None:
+        with UnitOfWork(self._session_factory) as uow:
+            existing = uow.session.execute(
+                select(VaultMetaRow).where(VaultMetaRow.id == 1)
+            ).scalar_one_or_none()
+
+            if existing is not None:
+                uow.session.delete(existing)
+                uow.commit()
+
 
 def _isoformat(dt: datetime) -> str:
     return dt.isoformat()

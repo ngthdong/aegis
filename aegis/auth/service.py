@@ -41,6 +41,11 @@ class AccountLocked(Exception):
         super().__init__(f"account locked until {locked_until.isoformat()}")
 
 
+def validate_password_strength(password: str) -> None:
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise WeakPassword(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
+
+
 @dataclass(frozen=True, slots=True)
 class LoginResult:
     token: str
@@ -63,8 +68,7 @@ class AuthService:
         self._audit = audit
 
     def register(self, username: str, password: str) -> str:
-        if len(password) < MIN_PASSWORD_LENGTH:
-            raise WeakPassword(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
+        validate_password_strength(password)
 
         if self._user_repository.get_by_username(username) is not None:
             raise UsernameTaken(f"username '{username}' is already taken")
@@ -137,7 +141,7 @@ class AuthService:
         if user.failed_login_count != 0 or user.locked_until is not None:
             self._user_repository.update_login_state(user.id, 0, None)
 
-        token = self._session_service.create(user.id, user.username)
+        token = self._session_service.create(user.id, user.username, user.role)
         expires_at = self._clock.now() + self._session_service.ttl
         self._audit.record(
             principal_id=user.id,

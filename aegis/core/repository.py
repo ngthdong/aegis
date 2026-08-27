@@ -21,6 +21,9 @@ class InMemoryVaultRepository:
     def save(self, meta: VaultMeta) -> None:
         self._meta = meta
 
+    def delete(self) -> None:
+        self._meta = None
+
 
 class JsonFileVaultRepository:
     def __init__(self, path: Path) -> None:
@@ -53,3 +56,6 @@ class JsonFileVaultRepository:
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_text(json.dumps(raw, indent=2))
+
+    def delete(self) -> None:
+        self._path.unlink(missing_ok=True)

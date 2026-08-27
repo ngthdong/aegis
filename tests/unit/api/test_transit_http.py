@@ -6,10 +6,19 @@ from fastapi.testclient import TestClient
 
 PASSPHRASE = "correct horse battery staple"
 PASSWORD = "correct-horse-battery"
+ADMIN_USERNAME = "bootstrap-admin"
+ADMIN_PASSWORD = "correct-horse-battery-admin"
 
 
 def _setup_vault(client: TestClient) -> None:
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post(
+        "/v1/vault/init",
+        json={
+            "passphrase": PASSPHRASE,
+            "admin_username": ADMIN_USERNAME,
+            "admin_password": ADMIN_PASSWORD,
+        },
+    )
     client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
 
 
@@ -23,6 +32,25 @@ def _register_and_login(client: TestClient, username: str) -> str:
 
 def _auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _make_admin_token(client: TestClient, username: str) -> str:
+    from sqlalchemy import select
+
+    from aegis.storage.models import UserRow
+
+    _register_and_login(client, username)
+    session_factory = client.app.state.session_factory
+    with session_factory() as session:
+        row = session.execute(select(UserRow).where(UserRow.username == username)).scalar_one()
+        row.role = "admin"
+        session.commit()
+
+    # Role is baked into the session at login time, so promoting the DB row
+    # after the fact requires a fresh login to pick it up.
+    resp = client.post("/v1/auth/login", json={"username": username, "password": PASSWORD})
+    assert resp.status_code == 200, resp.text
+    return resp.json()["token"]
 
 
 def _b64(data: bytes) -> str:
@@ -137,8 +165,10 @@ def test_tampered_ciphertext_returns_400_not_500(client: TestClient):
 def test_create_key_while_sealed_returns_503(client: TestClient):
     _setup_vault(client)
     token = _register_and_login(client, "alice")
+    admin_token = _make_admin_token(client, "admin-user")
 
-    client.post("/v1/vault/seal")
+    resp = client.post("/v1/vault/seal", headers=_auth_header(admin_token))
+    assert resp.status_code == 200
 
     resp = client.post("/v1/transit/keys/app-1", headers=_auth_header(token))
     assert resp.status_code == 503

@@ -3,19 +3,51 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 PASSPHRASE = "correct horse battery staple"
+PASSWORD = "correct-horse-battery"
+ADMIN_USERNAME = "bootstrap-admin"
+ADMIN_PASSWORD = "correct-horse-battery-admin"
+
+
+def _init_request(**overrides: str) -> dict[str, str]:
+    body = {
+        "passphrase": PASSPHRASE,
+        "admin_username": ADMIN_USERNAME,
+        "admin_password": ADMIN_PASSWORD,
+    }
+    body.update(overrides)
+    return body
 
 
 def _init_and_unseal(client: TestClient) -> None:
-    resp = client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    resp = client.post("/v1/vault/init", json=_init_request())
     assert resp.status_code == 200, resp.text
     resp = client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
     assert resp.status_code == 200, resp.text
 
 
+def _make_admin_token(client: TestClient, username: str) -> str:
+    from sqlalchemy import select
+
+    from aegis.storage.models import UserRow
+
+    resp = client.post("/v1/auth/register", json={"username": username, "password": PASSWORD})
+    assert resp.status_code == 201, resp.text
+
+    session_factory = client.app.state.session_factory
+    with session_factory() as session:
+        row = session.execute(select(UserRow).where(UserRow.username == username)).scalar_one()
+        row.role = "admin"
+        session.commit()
+
+    resp = client.post("/v1/auth/login", json={"username": username, "password": PASSWORD})
+    assert resp.status_code == 200, resp.text
+    return resp.json()["token"]
+
+
 def test_vault_lifecycle_over_http(client: TestClient):
     assert client.get("/v1/vault/status").json() == {"status": "uninitialized"}
 
-    resp = client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    resp = client.post("/v1/vault/init", json=_init_request())
     assert resp.status_code == 200
     assert resp.json() == {"status": "sealed"}
 
@@ -23,20 +55,21 @@ def test_vault_lifecycle_over_http(client: TestClient):
     assert resp.status_code == 200
     assert resp.json() == {"status": "unsealed"}
 
-    resp = client.post("/v1/vault/seal")
+    admin_token = _make_admin_token(client, "admin-user")
+    resp = client.post("/v1/vault/seal", headers={"Authorization": f"Bearer {admin_token}"})
     assert resp.status_code == 200
     assert resp.json() == {"status": "sealed"}
 
 
 def test_wrong_passphrase_over_http_returns_401(client: TestClient):
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post("/v1/vault/init", json=_init_request())
     resp = client.post("/v1/vault/unseal", json={"passphrase": "wrong"})
     assert resp.status_code == 401
 
 
 def test_double_init_returns_409(client: TestClient):
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
-    resp = client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post("/v1/vault/init", json=_init_request())
+    resp = client.post("/v1/vault/init", json=_init_request(admin_username="someone-else"))
     assert resp.status_code == 409
 
 

@@ -44,6 +44,7 @@ class SessionRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     username: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="user", server_default="user")
     token_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
 
     created_at: Mapped[str] = mapped_column(String, nullable=False)
@@ -60,6 +61,8 @@ class UserRow(Base):
 
     failed_login_count: Mapped[int] = mapped_column(nullable=False, default=0)
     locked_until: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    role: Mapped[str] = mapped_column(String, nullable=False, default="user", server_default="user")
 
     created_at: Mapped[str] = mapped_column(String, nullable=False)
 
