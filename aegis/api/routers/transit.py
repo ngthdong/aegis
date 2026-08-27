@@ -191,7 +191,7 @@ async def rotate_key(
     principal: CurrentPrincipal,
     transit: TransitServiceDependency,
     _vault_unsealed: RequireVaultUnsealed,
-) -> dict[str, int]:
+) -> RotateKeyResponse:
     version = transit.rotate_key(principal, name)
     return RotateKeyResponse(current_version=version)
 
