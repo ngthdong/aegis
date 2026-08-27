@@ -74,7 +74,16 @@ class VerifyResponse(BaseModel):
     signing_algorithm: str
 
 
-@router.post("/{name}", response_model=CreateKeyResponse, status_code=201)
+class RotateKeyResponse(BaseModel):
+    current_version: int
+
+
+@router.post(
+    "/{name}",
+    response_model=CreateKeyResponse,
+    status_code=201,
+    summary="Create a named Transit key",
+)
 async def create_key(
     name: str,
     principal: CurrentPrincipal,
@@ -88,7 +97,11 @@ async def create_key(
     return CreateKeyResponse(name=name, key_type=key_usage)
 
 
-@router.post("/{name}/encrypt", response_model=EncryptResponse)
+@router.post(
+    "/{name}/encrypt",
+    response_model=EncryptResponse,
+    summary="Encrypt plaintext under a symmetric (ENCRYPT_DECRYPT) key",
+)
 async def encrypt(
     name: str,
     body: EncryptRequest,
@@ -101,7 +114,11 @@ async def encrypt(
     return EncryptResponse(ciphertext=ciphertext_b64)
 
 
-@router.post("/{name}/decrypt", response_model=DecryptResponse)
+@router.post(
+    "/{name}/decrypt",
+    response_model=DecryptResponse,
+    summary="Decrypt a ciphertext blob produced by /encrypt",
+)
 async def decrypt(
     name: str,
     body: DecryptRequest,
@@ -113,7 +130,11 @@ async def decrypt(
     return DecryptResponse(plaintext=base64.b64encode(plaintext).decode("ascii"))
 
 
-@router.post("/{name}/sign", response_model=SignResponse)
+@router.post(
+    "/{name}/sign",
+    response_model=SignResponse,
+    summary="Sign a message or digest under an asymmetric (SIGN_VERIFY) key",
+)
 async def sign(
     name: str,
     body: SignRequest,
@@ -132,7 +153,11 @@ async def sign(
     return SignResponse(signature=signature)
 
 
-@router.post("/{name}/verify", response_model=VerifyResponse)
+@router.post(
+    "/{name}/verify",
+    response_model=VerifyResponse,
+    summary="Verify a signature against a named key",
+)
 async def verify(
     name: str,
     body: VerifyRequest,
@@ -156,7 +181,11 @@ async def verify(
     )
 
 
-@router.post("/{name}/rotate")
+@router.post(
+    "/{name}/rotate",
+    response_model=RotateKeyResponse,
+    summary="Rotate a key generating fresh, independent key material as a new version",
+)
 async def rotate_key(
     name: str,
     principal: CurrentPrincipal,
@@ -164,10 +193,14 @@ async def rotate_key(
     _vault_unsealed: RequireVaultUnsealed,
 ) -> dict[str, int]:
     version = transit.rotate_key(principal, name)
-    return {"current_version": version}
+    return RotateKeyResponse(current_version=version)
 
 
-@router.post("/{name}/disable", status_code=204)
+@router.post(
+    "/{name}/disable",
+    status_code=204,
+    summary="Disable a key (blocks new encrypt/sign; decrypt/verify remain allowed)",
+)
 async def disable(
     name: str,
     principal: CurrentPrincipal,
@@ -177,7 +210,11 @@ async def disable(
     transit.disable_key(principal, name)
 
 
-@router.delete("/{name}", status_code=204)
+@router.delete(
+    "/{name}",
+    status_code=204,
+    summary="Destroy a key permanently (irreversible; wipes all key material)",
+)
 async def destroy(
     name: str,
     principal: CurrentPrincipal,
