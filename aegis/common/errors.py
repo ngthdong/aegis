@@ -13,11 +13,13 @@ from aegis.core.service import (
 )
 from aegis.kv.service import SecretCorrupted, SecretNotFound
 from aegis.transit.service import (
+    InvalidMessageType,
     TransitDecryptionFailed,
     TransitKeyAlreadyExists,
     TransitKeyDestroyed,
     TransitKeyDisabled,
     TransitKeyNotFound,
+    TransitKeyVersionNotFound,
     WrongKeyType,
 )
 
@@ -132,4 +134,14 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def _transit_decryption_failed(
         request: Request, exc: TransitDecryptionFailed
     ) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(TransitKeyVersionNotFound)
+    async def _transit_key_version_not_found(
+        request: Request, exc: TransitKeyVersionNotFound
+    ) -> JSONResponse:
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidMessageType)
+    async def _invalid_message_type(request: Request, exc: InvalidMessageType) -> JSONResponse:
         return JSONResponse(status_code=400, content={"detail": str(exc)})
