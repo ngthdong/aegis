@@ -9,10 +9,19 @@ from aegis.common.clock import FakeClock
 
 PASSPHRASE = "correct horse battery staple"
 PASSWORD = "correct-horse-battery"
+ADMIN_USERNAME = "bootstrap-admin"
+ADMIN_PASSWORD = "correct-horse-battery-admin"
 
 
 def _setup_user(client: TestClient, username: str = "alice") -> None:
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post(
+        "/v1/vault/init",
+        json={
+            "passphrase": PASSPHRASE,
+            "admin_username": ADMIN_USERNAME,
+            "admin_password": ADMIN_PASSWORD,
+        },
+    )
     client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
     resp = client.post("/v1/auth/register", json={"username": username, "password": PASSWORD})
     assert resp.status_code == 201, resp.text

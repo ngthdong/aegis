@@ -38,6 +38,7 @@ class SqlSessionRepository:
                 id=session.id,
                 user_id=session.user_id,
                 username=session.username,
+                role=session.role,
                 token_hash=session.token_hash,
                 created_at=session.created_at.isoformat(),
                 expires_at=session.expires_at.isoformat(),
@@ -74,4 +75,5 @@ def _row_to_record(row: SessionRow) -> SessionRecord:
         created_at=datetime.fromisoformat(row.created_at),
         expires_at=datetime.fromisoformat(row.expires_at),
         revoked_at=datetime.fromisoformat(row.revoked_at) if row.revoked_at else None,
+        role=row.role,
     )

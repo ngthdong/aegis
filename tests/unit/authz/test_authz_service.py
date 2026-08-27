@@ -16,6 +16,7 @@ class StubResource:
 
 ALICE = Principal(user_id="user-alice", username="alice")
 BOB = Principal(user_id="user-bob", username="bob")
+ADMIN = Principal(user_id="user-admin", username="root", role="admin")
 
 
 @pytest.fixture
@@ -56,3 +57,20 @@ def test_permission_denied_message_does_not_leak_resource_content(authz: AuthzSe
         authz.require(BOB, "read", resource)
     assert resource.owner_id not in str(exc_info.value)
     assert resource.id not in str(exc_info.value)
+
+
+def test_is_admin_true_for_admin_role(authz: AuthzService):
+    assert authz.is_admin(ADMIN) is True
+
+
+def test_is_admin_false_for_regular_user(authz: AuthzService):
+    assert authz.is_admin(ALICE) is False
+
+
+def test_require_admin_does_not_raise_for_admin(authz: AuthzService):
+    authz.require_admin(ADMIN)  # must not raise
+
+
+def test_require_admin_raises_for_regular_user(authz: AuthzService):
+    with pytest.raises(PermissionDenied):
+        authz.require_admin(ALICE)

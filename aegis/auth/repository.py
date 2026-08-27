@@ -62,6 +62,7 @@ class SqlUserRepository:
                 password_hash=user.password_hash,
                 failed_login_count=user.failed_login_count,
                 locked_until=user.locked_until.isoformat() if user.locked_until else None,
+                role=user.role,
                 created_at=user.created_at.isoformat(),
             )
             uow.session.add(row)
@@ -87,5 +88,6 @@ def _row_to_user(row: UserRow) -> User:
         password_hash=row.password_hash,
         failed_login_count=row.failed_login_count,
         locked_until=datetime.fromisoformat(row.locked_until) if row.locked_until else None,
+        role=row.role,
         created_at=row.created_at_dt,
     )

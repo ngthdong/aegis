@@ -4,10 +4,19 @@ from fastapi.testclient import TestClient
 
 PASSPHRASE = "correct horse battery staple"
 PASSWORD = "correct-horse-battery"
+ADMIN_USERNAME = "bootstrap-admin"
+ADMIN_PASSWORD = "correct-horse-battery-admin"
 
 
 def _setup_vault_and_login(client: TestClient, username: str = "alice") -> str:
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post(
+        "/v1/vault/init",
+        json={
+            "passphrase": PASSPHRASE,
+            "admin_username": ADMIN_USERNAME,
+            "admin_password": ADMIN_PASSWORD,
+        },
+    )
     client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
     client.post("/v1/auth/register", json={"username": username, "password": PASSWORD})
     resp = client.post("/v1/auth/login", json={"username": username, "password": PASSWORD})
@@ -36,7 +45,14 @@ def test_metrics_reflect_vault_seal_state(client: TestClient):
     resp = client.get("/metrics")
     assert "aegis_vault_sealed 1.0" in resp.text
 
-    client.post("/v1/vault/init", json={"passphrase": PASSPHRASE})
+    client.post(
+        "/v1/vault/init",
+        json={
+            "passphrase": PASSPHRASE,
+            "admin_username": ADMIN_USERNAME,
+            "admin_password": ADMIN_PASSWORD,
+        },
+    )
     client.post("/v1/vault/unseal", json={"passphrase": PASSPHRASE})
 
     resp = client.get("/metrics")

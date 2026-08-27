@@ -38,6 +38,13 @@ class VaultRepository(Protocol):
 
     def load(self) -> VaultMeta | None: ...
     def save(self, meta: VaultMeta) -> None: ...
+    def delete(self) -> None:
+        """
+        Remove any persisted vault metadata. Used to compensate a bootstrap
+        that initialized the Vault but failed to create its initial admin
+        user, so a retry starts from a clean UNINITIALIZED state.
+        """
+        ...
 
 
 class VaultAlreadyInitialized(Exception):
@@ -55,6 +62,12 @@ class InvalidPassphrase(Exception):
     """
 
 
+class VaultAlreadySealed(Exception):
+    """
+    Raised when seal() is called on a vault that is already sealed.
+    """
+
+
 class VaultService:
     def __init__(
         self,
@@ -63,7 +76,7 @@ class VaultService:
     ) -> None:
         self._repository = repository
         self._default_kdf_params = kdf_params or KdfParams()
-        self._dek: bytes | None = None  # in-memory only
+        self._dek: bytearray | None = None  # in-memory only
 
     def status(self) -> VaultState:
         if self._dek is not None:
@@ -107,12 +120,21 @@ class VaultService:
         finally:
             master_key = b"\x00" * len(master_key)
 
-        self._dek = dek
+        self._dek = bytearray(dek)
 
     def seal(self) -> None:
+        state = self.status()
+        if state == VaultState.UNINITIALIZED:
+            raise VaultNotInitialized("vault has not been initialized")
+        if state == VaultState.SEALED:
+            raise VaultAlreadySealed("vault is already sealed")
+
+        assert self._dek is not None
+        for i in range(len(self._dek)):
+            self._dek[i] = 0
         self._dek = None
 
     def get_dek(self) -> bytes:
         if self._dek is None:
             raise VaultNotInitialized("vault is sealed or not initialized")
-        return self._dek
+        return bytes(self._dek)

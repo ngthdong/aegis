@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, cast
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from aegis.audit.logger import AuditLogger
@@ -24,6 +24,7 @@ from aegis.core.service import VaultService
 from aegis.core.state import VaultState
 from aegis.kv.repository import SqlSecretRepository
 from aegis.kv.service import KvService
+from aegis.storage.repository import SqlVaultRepository
 from aegis.transit.repository import SqlTransitKeyRepository
 from aegis.transit.service import TransitService
 
@@ -99,7 +100,7 @@ def require_vault_unsealed(
 
 def get_current_principal(
     request: Request,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)],
 ) -> Principal:
     if credentials is None:
         raise InvalidSessionError("missing bearer token")
@@ -111,12 +112,29 @@ def get_current_principal(
         raise InvalidSessionError("invalid or expired session") from exc
 
 
+def require_admin(
+    principal: Annotated[Principal, Depends(get_current_principal)],
+) -> None:
+    get_authz_service().require_admin(principal)
+
+
+def get_user_repository(request: Request) -> SqlUserRepository:
+    return SqlUserRepository(request.app.state.session_factory)
+
+
+def get_vault_repository(request: Request) -> SqlVaultRepository:
+    return SqlVaultRepository(request.app.state.session_factory)
+
+
 VaultServiceDependency = Annotated[VaultService, Depends(get_vault_service)]
+UserRepositoryDependency = Annotated[SqlUserRepository, Depends(get_user_repository)]
+VaultRepositoryDependency = Annotated[SqlVaultRepository, Depends(get_vault_repository)]
 AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
 RequireVaultUnsealed = Annotated[None, Depends(require_vault_unsealed)]
+RequireAdmin = Annotated[None, Depends(require_admin)]
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
 SessionServiceDependency = Annotated[SessionService, Depends(get_session_service)]
 KvServiceDependency = Annotated[KvService, Depends(get_kv_service)]
 TransitServiceDependency = Annotated[TransitService, Depends(get_transit_service)]
 AuditRepositoryDependency = Annotated[SqlAuditRepository, Depends(get_audit_repository)]
-BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]
+BearerCredentials = Annotated[HTTPAuthorizationCredentials | None, Security(bearer_scheme)]

@@ -9,6 +9,7 @@ from aegis.authz.service import PermissionDenied
 from aegis.core.service import (
     InvalidPassphrase,
     VaultAlreadyInitialized,
+    VaultAlreadySealed,
     VaultNotInitialized,
 )
 from aegis.kv.service import SecretCorrupted, SecretNotFound
@@ -57,6 +58,10 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(VaultNotInitialized)
     async def _vault_not_initialized(request: Request, exc: VaultNotInitialized) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(VaultAlreadySealed)
+    async def _vault_already_sealed(request: Request, exc: VaultAlreadySealed) -> JSONResponse:
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(InvalidPassphrase)
