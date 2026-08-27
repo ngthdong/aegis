@@ -22,66 +22,6 @@ Aegis is a secret management and cryptographic service inspired by HashiCorp Vau
 
 ---
 
-## API Reference
-#### Health & Observability
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| GET    | /health  | Liveness probe. Returns whether the service is running.|
-| GET    | /ready  | Readiness probe. Checks database connectivity and vault state before reporting the service as ready.|
-| GET    | /metrics | Exposes Prometheus metrics including request counts, latency, vault status, authentication failures, KV operations, and Transit operations.|
-
-#### Vault Management
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| POST   | /v1/vault/init | Initializes the vault by deriving the master key from the provided passphrase and creating the encrypted Data Encryption Key (DEK).|
-| POST   | /v1/vault/unseal | Unlocks the vault by decrypting the DEK using the passphrase-derived master key.|
-| POST   | /v1/vault/seal | Removes the decrypted DEK from memory and locks the vault.| 
-| GET    | /v1/vault/status | Returns the current vault state (uninitialized, sealed, or unsealed).| 
-
-#### Authentication
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| POST   | /v1/auth/register | Creates a new user account with an Argon2id-hashed password. |
-| POST   | /v1/auth/login | Authenticates a user and issues a bearer session token. |
-| POST   | /v1/auth/logout | Revokes the current session token. | 
-| GET    | /v1/auth/me | Returns information about the authenticated user. | 
-
-#### Key-Value Secret Engine
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| PUT    | /v1/kv/{path} | Encrypts and stores a JSON secret at the specified path. |
-| GET    | /v1/kv/{path}?version=N | Retrieves and decrypts a secret from the specified path. |
-| DELETE | /v1/kv/{path} | Permanently deletes a secret. |
-
-#### Key Management
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| POST   | /v1/transit/keys/{name} | Creates a new cryptographic key (symmetric or Ed25519 signing key). |
-| POST   | /v1/transit/keys/{name}/disable | Disables a key, preventing further cryptographic operations. |
-| DELETE | /v1/transit/keys/{name} | Permanently destroys a key. |
-
-#### Cryptographic Operations
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| POST   | /v1/transit/keys/{name}/encrypt | Encrypts Base64-encoded plaintext using the specified key. |
-| POST   | /v1/transit/keys/{name}/decrypt | Decrypts ciphertext produced by the Transit engine. |
-| POST   | /v1/transit/keys/{name}/sign | Generates an Ed25519 digital signature for a message. | 
-| POST   | /v1/transit/keys/{name}/verify | Verifies an Ed25519 digital signature. | 
-
-#### Audit
-
-| Method | Endpoint | Decription |
-|--------|----------|------------|
-| GET    | /v1/audit | Returns the authenticated user's audit trail with optional filtering by principal, action, timestamp, and pagination. |
-
----
-
 ## Getting Started
 
 ### Installation
@@ -120,6 +60,14 @@ The service will be available at:
 http://127.0.0.1:8000
 ```
 ---
+
+## API Documentation
+
+Interactive Swagger UI is available at:
+
+```bash
+http://127.0.0.1:8000/docs
+```
 
 ## Running Tests
 
